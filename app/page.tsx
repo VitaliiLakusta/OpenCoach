@@ -203,208 +203,267 @@ export default function Home() {
   }, [notificationPermission])
 
   return (
-    <div style={{ 
-      display: 'flex', 
-      flexDirection: 'column', 
-      height: '100vh',
-      maxWidth: '800px',
-      margin: '0 auto',
-      padding: '20px',
-      background: 'white'
-    }}>
-      <h1 style={{ marginBottom: '20px', fontSize: '24px', fontWeight: 'bold' }}>
-        OpenCoach
-      </h1>
-      
-      <div style={{ marginBottom: '20px', padding: '12px', background: '#e3f2fd', borderRadius: '8px', fontSize: '14px' }}>
-        <div style={{ marginBottom: '8px' }}>
-          Notification Status: {notificationPermission === 'granted' ? '✅ Granted' 
-            : notificationPermission === 'denied' ? '❌ Denied' 
-            : notificationPermission === 'default' ? '⏳ Pending'
-            : notificationPermission === 'checking' ? '⏳ Checking...'
-            : '❌ Not Supported'}
-        </div>
-        {notificationPermission !== 'granted' && notificationPermission !== 'unsupported' && notificationPermission !== 'checking' && (
-          <button
-            onClick={async () => {
-              if (typeof window !== 'undefined' && 'Notification' in window) {
-                const permission = await Notification.requestPermission()
-                setNotificationPermission(permission)
-                if (permission === 'granted') {
-                  new Notification('OpenCoach', { body: 'Test notification!' })
-                }
-              }
-            }}
-            style={{
-              padding: '8px 16px',
-              background: '#1976d2',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              fontSize: '14px',
-            }}
-          >
-            Request Notification Permission
-          </button>
-        )}
-        {notificationPermission === 'granted' && (
-          <>
-            <button
-              onClick={() => {
-                console.log('=== MANUAL TEST BUTTON CLICKED ===')
-                if (typeof window !== 'undefined' && 'Notification' in window) {
-                  console.log('Creating manual test notification...')
-                  try {
-                    const notification = new Notification('OpenCoach Manual Test', { 
-                      body: `Manual test at ${new Date().toLocaleTimeString()}!`,
-                      requireInteraction: true,
-                      silent: false,
-                    })
-                    console.log('Manual notification object created:', notification)
-                    
-                    notification.onclick = () => {
-                      console.log('✅ Manual test notification clicked!')
-                      window.focus()
-                      notification.close()
-                    }
-                    notification.onshow = () => {
-                      console.log('✅✅✅ Manual test notification SHOWN!')
-                    }
-                    notification.onerror = (error) => {
-                      console.error('❌ Manual test notification error:', error)
-                    }
-                    notification.onclose = () => {
-                      console.log('Manual test notification closed')
-                    }
-                  } catch (error) {
-                    console.error('❌ Exception in manual test:', error)
-                  }
-                } else {
-                  console.error('Notifications not supported in this context')
-                }
-              }}
-              style={{
-                padding: '8px 16px',
-                background: '#4caf50',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '14px',
-                marginLeft: '8px',
-              }}
-            >
-              Test Notification
-            </button>
-            <div style={{ fontSize: '12px', color: '#666', marginTop: '8px' }}>
-              Check browser console for detailed logs. If you see "Notification SHOWN" but no popup, check your OS/browser notification settings.
+    <div className="min-h-screen flex flex-col bg-gradient-to-b from-slate-50 to-white">
+      {/* Header */}
+      <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-md border-b border-slate-200 shadow-sm">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-xl shadow-lg">
+                O
+              </div>
+              <h1 className="text-2xl font-semibold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                OpenCoach
+              </h1>
             </div>
-          </>
-        )}
-        {notificationPermission === 'unsupported' && (
-          <div style={{ fontSize: '12px', color: '#666', marginTop: '8px' }}>
-            Your browser does not support notifications. Try using Chrome, Firefox, or Safari.
           </div>
-        )}
-      </div>
-      
-      <div style={{ marginBottom: '20px', padding: '12px', background: '#f0f0f0', borderRadius: '8px' }}>
-        <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 'bold' }}>
-          Notes Folder Path:
-        </label>
-        <input
-          type="text"
-          value={notesFolderPath}
-          onChange={(e) => setNotesFolderPath(e.target.value)}
-          placeholder="/path/to/your/notes/folder"
-          style={{
-            width: '100%',
-            padding: '8px',
-            border: '1px solid #ddd',
-            borderRadius: '4px',
-            fontSize: '14px',
-          }}
-        />
-        <div style={{ marginTop: '4px', fontSize: '12px', color: '#666' }}>
-          Enter the absolute path to the folder containing your notes
         </div>
-      </div>
-      
-      <div style={{ 
-        flex: 1, 
-        overflowY: 'auto', 
-        marginBottom: '20px',
-        padding: '20px',
-        background: '#f9f9f9',
-        borderRadius: '8px'
-      }}>
-        {messages.length === 0 && (
-          <div style={{ color: '#666', textAlign: 'center', marginTop: '40px' }}>
-            Start a conversation with OpenCoach...
-          </div>
-        )}
-        {messages.map((message) => (
-          <div
-            key={message.id}
-            style={{
-              marginBottom: '16px',
-              padding: '12px',
-              borderRadius: '8px',
-              background: message.role === 'user' ? '#e3f2fd' : '#f5f5f5',
-              textAlign: message.role === 'user' ? 'right' : 'left',
-            }}
-          >
-            <div style={{ 
-              fontWeight: 'bold', 
-              marginBottom: '4px',
-              fontSize: '12px',
-              color: '#666'
-            }}>
-              {message.role === 'user' ? 'You' : 'OpenCoach'}
+      </header>
+
+      {/* Settings Panel - Collapsible */}
+      <div className="max-w-4xl mx-auto w-full px-4 sm:px-6 lg:px-8 mt-6">
+        <details className="group">
+          <summary className="cursor-pointer list-none">
+            <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm hover:shadow-md transition-all duration-200">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-slate-700">⚙️ Configuration</span>
+                <svg className="w-5 h-5 text-slate-400 group-open:rotate-180 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
             </div>
-            <div style={{ whiteSpace: 'pre-wrap' }}>{message.content}</div>
+          </summary>
+          
+          <div className="mt-3 space-y-3">
+            {/* Notification Settings */}
+            <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
+              <h3 className="text-sm font-semibold text-slate-800 mb-3">Notifications</h3>
+              <div className="flex items-center gap-3 mb-3">
+                <span className="text-2xl">
+                  {notificationPermission === 'granted' ? '✅' 
+                    : notificationPermission === 'denied' ? '❌' 
+                    : notificationPermission === 'checking' ? '⏳' 
+                    : notificationPermission === 'unsupported' ? '❌'
+                    : '⏳'}
+                </span>
+                <div className="flex-1">
+                  <p className="text-sm text-slate-600">
+                    Status: <span className="font-medium text-slate-800">
+                      {notificationPermission === 'granted' ? 'Granted' 
+                        : notificationPermission === 'denied' ? 'Denied' 
+                        : notificationPermission === 'default' ? 'Pending'
+                        : notificationPermission === 'checking' ? 'Checking...'
+                        : 'Not Supported'}
+                    </span>
+                  </p>
+                </div>
+              </div>
+              
+              <div className="flex gap-2">
+                {notificationPermission !== 'granted' && notificationPermission !== 'unsupported' && notificationPermission !== 'checking' && (
+                  <button
+                    onClick={async () => {
+                      if (typeof window !== 'undefined' && 'Notification' in window) {
+                        const permission = await Notification.requestPermission()
+                        setNotificationPermission(permission)
+                        if (permission === 'granted') {
+                          new Notification('OpenCoach', { body: 'Test notification!' })
+                        }
+                      }
+                    }}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors duration-200 shadow-sm"
+                  >
+                    Enable Notifications
+                  </button>
+                )}
+                {notificationPermission === 'granted' && (
+                  <button
+                    onClick={() => {
+                      console.log('=== MANUAL TEST BUTTON CLICKED ===')
+                      if (typeof window !== 'undefined' && 'Notification' in window) {
+                        console.log('Creating manual test notification...')
+                        try {
+                          const notification = new Notification('OpenCoach Manual Test', { 
+                            body: `Manual test at ${new Date().toLocaleTimeString()}!`,
+                            requireInteraction: true,
+                            silent: false,
+                          })
+                          console.log('Manual notification object created:', notification)
+                          
+                          notification.onclick = () => {
+                            console.log('✅ Manual test notification clicked!')
+                            window.focus()
+                            notification.close()
+                          }
+                          notification.onshow = () => {
+                            console.log('✅✅✅ Manual test notification SHOWN!')
+                          }
+                          notification.onerror = (error) => {
+                            console.error('❌ Manual test notification error:', error)
+                          }
+                          notification.onclose = () => {
+                            console.log('Manual test notification closed')
+                          }
+                        } catch (error) {
+                          console.error('❌ Exception in manual test:', error)
+                        }
+                      } else {
+                        console.error('Notifications not supported in this context')
+                      }
+                    }}
+                    className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors duration-200 shadow-sm"
+                  >
+                    Test Notification
+                  </button>
+                )}
+              </div>
+              
+              {notificationPermission === 'granted' && (
+                <p className="text-xs text-slate-500 mt-3">
+                  Check browser console for detailed logs. If you see "Notification SHOWN" but no popup, check your OS/browser notification settings.
+                </p>
+              )}
+              {notificationPermission === 'unsupported' && (
+                <p className="text-xs text-slate-500 mt-3">
+                  Your browser does not support notifications. Try using Chrome, Firefox, or Safari.
+                </p>
+              )}
+            </div>
+            
+            {/* Notes Folder Path */}
+            <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
+              <label className="block text-sm font-semibold text-slate-800 mb-3">
+                Notes Folder Path
+              </label>
+              <input
+                type="text"
+                value={notesFolderPath}
+                onChange={(e) => setNotesFolderPath(e.target.value)}
+                placeholder="/path/to/your/notes/folder"
+                className="w-full px-4 py-2.5 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all duration-200"
+              />
+              <p className="text-xs text-slate-500 mt-2">
+                Enter the absolute path to the folder containing your notes
+              </p>
+            </div>
           </div>
-        ))}
-        {isLoading && (
-          <div style={{ color: '#666', fontStyle: 'italic' }}>
-            Thinking...
-          </div>
-        )}
+        </details>
       </div>
 
-      <form onSubmit={handleSubmit} style={{ display: 'flex', gap: '10px' }}>
-        <input
-          value={input}
-          onChange={handleInputChange}
-          placeholder="Type your message..."
-          disabled={isLoading}
-          style={{
-            flex: 1,
-            padding: '12px',
-            border: '1px solid #ddd',
-            borderRadius: '8px',
-            fontSize: '16px',
-          }}
-        />
-        <button
-          type="submit"
-          disabled={isLoading}
-          style={{
-            padding: '12px 24px',
-            background: '#1976d2',
-            color: 'white',
-            border: 'none',
-            borderRadius: '8px',
-            cursor: isLoading ? 'not-allowed' : 'pointer',
-            fontSize: '16px',
-            fontWeight: 'bold',
-            opacity: isLoading ? 0.6 : 1,
-          }}
-        >
-          Send
-        </button>
-      </form>
+      {/* Chat Messages */}
+      <div className="flex-1 max-w-4xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 overflow-y-auto">
+        {messages.length === 0 && (
+          <div className="h-full flex items-center justify-center">
+            <div className="text-center space-y-4">
+              <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-3xl shadow-lg">
+                O
+              </div>
+              <h2 className="text-2xl font-semibold text-slate-800">Welcome to OpenCoach</h2>
+              <p className="text-slate-500 max-w-md">
+                Start a conversation with your AI coaching assistant. Ask questions, share thoughts, or get guidance on your goals.
+              </p>
+            </div>
+          </div>
+        )}
+        
+        <div className="space-y-6">
+          {messages.map((message, index) => (
+            <div
+              key={message.id}
+              className={`flex gap-4 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+            >
+              {message.role === 'assistant' && (
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm shadow-md flex-shrink-0 mt-1">
+                  O
+                </div>
+              )}
+              
+              <div className={`flex flex-col max-w-3xl ${message.role === 'user' ? 'items-end' : 'items-start'}`}>
+                <div
+                  className={`
+                    px-5 py-3.5 rounded-2xl shadow-sm
+                    ${message.role === 'user' 
+                      ? 'bg-gradient-to-br from-blue-600 to-blue-700 text-white' 
+                      : 'bg-white border border-slate-200 text-slate-800'
+                    }
+                  `}
+                >
+                  <div className="text-sm leading-relaxed whitespace-pre-wrap break-words">
+                    {message.content}
+                  </div>
+                </div>
+              </div>
+              
+              {message.role === 'user' && (
+                <div className="w-8 h-8 rounded-lg bg-slate-700 flex items-center justify-center text-white font-medium text-sm shadow-md flex-shrink-0 mt-1">
+                  U
+                </div>
+              )}
+            </div>
+          ))}
+          
+          {isLoading && (
+            <div className="flex gap-4 justify-start">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm shadow-md flex-shrink-0">
+                O
+              </div>
+              <div className="bg-white border border-slate-200 px-5 py-3.5 rounded-2xl shadow-sm">
+                <div className="flex items-center gap-2">
+                  <div className="flex gap-1">
+                    <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                    <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                    <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                  </div>
+                  <span className="text-sm text-slate-500">Thinking...</span>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Input Form */}
+      <div className="sticky bottom-0 bg-gradient-to-t from-white via-white to-transparent pt-6 pb-6">
+        <div className="max-w-4xl mx-auto w-full px-4 sm:px-6 lg:px-8">
+          <form onSubmit={handleSubmit} className="relative">
+            <div className="flex items-end gap-3 bg-white rounded-2xl shadow-lg border border-slate-200 p-2 focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent transition-all duration-200">
+              <textarea
+                value={input}
+                onChange={handleInputChange}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault()
+                    handleSubmit(e)
+                  }
+                }}
+                placeholder="Message OpenCoach..."
+                disabled={isLoading}
+                rows={1}
+                className="flex-1 px-4 py-3 bg-transparent resize-none outline-none text-slate-800 placeholder-slate-400 max-h-40 overflow-y-auto"
+                style={{ minHeight: '24px' }}
+              />
+              <button
+                type="submit"
+                disabled={isLoading || !input.trim()}
+                className={`
+                  p-3 rounded-xl font-medium transition-all duration-200 flex-shrink-0
+                  ${isLoading || !input.trim()
+                    ? 'bg-slate-200 text-slate-400 cursor-not-allowed' 
+                    : 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-md hover:shadow-lg'
+                  }
+                `}
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                </svg>
+              </button>
+            </div>
+            <p className="text-xs text-slate-400 mt-2 text-center">
+              Press Enter to send, Shift+Enter for new line
+            </p>
+          </form>
+        </div>
+      </div>
     </div>
   )
 }
