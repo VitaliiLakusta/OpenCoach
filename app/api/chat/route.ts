@@ -47,7 +47,7 @@ Always use the writeToFile tool with mode='append' when adding TODO items. The f
       }
     }
 
-    const systemPrompt = 'You are OpenCoach, an AI coaching assistant. Help the user with their goals and priorities. When creating calendar events, always provide both the Google Calendar link and the .ics file download link so users can add the event to their preferred calendar app.' + notesContent
+    const systemPrompt = 'You are OpenCoach, an AI coaching assistant. Help the user with their goals and priorities. When creating calendar events, always provide both the Google Calendar link and the .ics file download link so users can add the event to their preferred calendar app. CRITICAL: When using the createGoogleCalendarLink tool, the tool returns a "markdownResponse" field with pre-formatted markdown links. You MUST copy and paste the "markdownResponse" value exactly as-is into your response. Do NOT create your own links, modify the URLs, or use localhost URLs. Simply use the markdownResponse field directly.' + notesContent
 
     const result = await streamText({
       model: openai('gpt-3.5-turbo'),
@@ -77,7 +77,7 @@ Always use the writeToFile tool with mode='append' when adding TODO items. The f
           },
         }),
         createGoogleCalendarLink: tool({
-          description: 'Generate a Google Calendar link and .ics file for creating a calendar event. Use this when the user asks to create a calendar reminder, event, or schedule something. Returns both a Google Calendar link and an .ics file download link that works with any calendar app (Apple Calendar, Outlook, etc.).',
+          description: 'Generate a Google Calendar link and .ics file for creating a calendar event. Use this when the user asks to create a calendar reminder, event, or schedule something. Returns both a Google Calendar link and an .ics file download link that works with any calendar app (Apple Calendar, Outlook, etc.). CRITICAL INSTRUCTIONS: The tool returns a "message" field that contains the complete formatted response with markdown links. You MUST use the "message" field value EXACTLY as-is in your response. Do NOT create your own links, modify the URLs, add your own text, or use localhost URLs. Simply return the "message" field value directly without any modifications.',
           parameters: z.object({
             title: z.string().describe('The title/name of the calendar event'),
             startDateTime: z.string().describe('Start date and time in ISO 8601 format (e.g., "2026-01-15T14:00:00Z" for UTC, or "2026-01-15T14:00:00" for local time)'),
@@ -187,15 +187,47 @@ Always use the writeToFile tool with mode='append' when adding TODO items. The f
               icsContent.push('END:VCALENDAR')
 
               const icsFileContent = icsContent.join('\r\n')
+              const icsFileName = `${title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.ics`
 
-              // Create data URL for .ics file download
-              const icsDataUrl = `data:text/calendar;charset=utf-8,${encodeURIComponent(icsFileContent)}`
+              // Create API endpoint URL for .ics file download
+              // Build query parameters for the API endpoint
+              const icsParams = new URLSearchParams({
+                title: title,
+                startDateTime: startDate.toISOString(),
+                endDateTime: endDate.toISOString(),
+              })
+              if (description) {
+                icsParams.append('description', description)
+              }
+              if (location) {
+                icsParams.append('location', location)
+              }
+              if (recurrence) {
+                icsParams.append('recurrence', recurrence)
+              }
+              
+              // Use the API endpoint instead of data URL
+              const icsDataUrl = `/api/calendar/ics?${icsParams.toString()}`
+              
+              // Also keep the data URL for backwards compatibility, but prefer the API endpoint
+              const icsDataUrlFallback = `data:text/calendar;charset=utf-8,${encodeURIComponent(icsFileContent)}`
+
+              // Create pre-formatted markdown links that the agent should use exactly as-is
+              const googleCalendarMarkdown = `[Add to Google Calendar](${calendarUrl})`
+              const icsFileMarkdown = `[Download .ics file](${icsDataUrl})`
 
               return {
                 success: true,
+                // Primary message that agent should use directly
+                message: `I've created a calendar event "${title}". Here are the links to add it to your calendar:\n\n${googleCalendarMarkdown}\n\n${icsFileMarkdown}`,
+                // Also provide the markdown separately for reference
+                markdownResponse: `${googleCalendarMarkdown}\n\n${icsFileMarkdown}`,
+                // Individual components for reference
                 googleCalendarUrl: calendarUrl,
+                googleCalendarMarkdown: googleCalendarMarkdown,
                 icsDataUrl: icsDataUrl,
-                icsFileName: `${title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.ics`,
+                icsFileMarkdown: icsFileMarkdown,
+                icsFileName: icsFileName,
                 eventDetails: {
                   title,
                   start: startDate.toISOString(),

@@ -451,7 +451,105 @@ export default function Home() {
                 >
                   {message.role === 'assistant' ? (
                     <div className="text-sm leading-relaxed prose prose-sm max-w-none prose-a:text-blue-600 prose-a:no-underline hover:prose-a:underline">
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                      <ReactMarkdown 
+                        remarkPlugins={[remarkGfm]}
+                        components={{
+                          a: ({ href, children, ...props }) => {
+                            // Handle .ics file links (both data URLs and API endpoints)
+                            if (href && (href.startsWith('data:text/calendar') || href.startsWith('/api/calendar/ics'))) {
+                              const handleDownload = (e: React.MouseEvent<HTMLAnchorElement>) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                
+                                // For API endpoints, fetch and download the file
+                                if (href.startsWith('/api/calendar/ics')) {
+                                  fetch(href)
+                                    .then(response => response.blob())
+                                    .then(blob => {
+                                      const url = URL.createObjectURL(blob)
+                                      const a = document.createElement('a')
+                                      a.href = url
+                                      a.download = 'event.ics'
+                                      document.body.appendChild(a)
+                                      a.click()
+                                      document.body.removeChild(a)
+                                      URL.revokeObjectURL(url)
+                                    })
+                                    .catch(error => {
+                                      console.error('Error downloading .ics file:', error)
+                                    })
+                                  return
+                                }
+                                
+                                // For data URLs, handle the download programmatically
+                                try {
+                                  // Extract content from data URL
+                                  const commaIndex = href.indexOf(',')
+                                  if (commaIndex === -1) {
+                                    throw new Error('Invalid data URL format')
+                                  }
+                                  const contentPart = href.substring(commaIndex + 1)
+                                  
+                                  // Try to extract filename from the link text
+                                  let filename = 'event.ics'
+                                  if (typeof children === 'string') {
+                                    // If link text contains .ics, use it as filename
+                                    if (children.includes('.ics')) {
+                                      filename = children.replace(/[^a-z0-9._-]/gi, '_').toLowerCase()
+                                      if (!filename.endsWith('.ics')) {
+                                        filename += '.ics'
+                                      }
+                                    } else {
+                                      // Otherwise, create filename from link text
+                                      filename = children.replace(/[^a-z0-9._-]/gi, '_').toLowerCase() + '.ics'
+                                    }
+                                  }
+                                  
+                                  // Decode the data URL content
+                                  const decodedContent = decodeURIComponent(contentPart)
+                                  
+                                  // Create blob and download
+                                  const blob = new Blob([decodedContent], { type: 'text/calendar;charset=utf-8' })
+                                  const url = URL.createObjectURL(blob)
+                                  const a = document.createElement('a')
+                                  a.href = url
+                                  a.download = filename
+                                  document.body.appendChild(a)
+                                  a.click()
+                                  document.body.removeChild(a)
+                                  URL.revokeObjectURL(url)
+                                } catch (error) {
+                                  console.error('Error downloading .ics file:', error)
+                                }
+                              }
+                              
+                              return (
+                                <a 
+                                  href={href} 
+                                  onClick={handleDownload}
+                                  className="text-blue-600 hover:underline"
+                                  {...props}
+                                >
+                                  {children}
+                                </a>
+                              )
+                            }
+                            
+                            // Regular links open in new tab
+                            return (
+                              <a 
+                                href={href} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="text-blue-600 hover:underline"
+                                {...props}
+                              >
+                                {children}
+                              </a>
+                            )
+                          }
+                        }}
+                      >
                         {message.content}
                       </ReactMarkdown>
                     </div>
