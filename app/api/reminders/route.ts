@@ -13,9 +13,11 @@ type StateFile = {
   reminders?: Array<{
     dateTime: string
     reminderText: string
+    completed?: boolean
   }>
   lastRun?: string
   lastContextMtimeMs?: number
+  notesFolderPath?: string
   // Allow arbitrary extra fields without type errors
   [key: string]: any
 }
@@ -97,11 +99,50 @@ export async function POST(req: Request) {
     }
 
     const nowIso = new Date().toISOString()
+    
+    // Merge new reminders with existing ones, preserving completed status
+    const existingReminders = state.reminders || []
+    const existingRemindersMap = new Map<string, { dateTime: string; reminderText: string; completed?: boolean }>()
+    
+    // Create a map of existing reminders by dateTime
+    for (const existing of existingReminders) {
+      existingRemindersMap.set(existing.dateTime, existing)
+    }
+    
+    // Merge: preserve completed reminders, update/add others
+    const mergedReminders: Array<{ dateTime: string; reminderText: string; completed?: boolean }> = []
+    
+    // First, add all new reminders (or update existing non-completed ones)
+    for (const newReminder of remindersPayload.reminders) {
+      const existing = existingRemindersMap.get(newReminder.dateTime)
+      if (existing && existing.completed === true) {
+        // Keep the completed reminder as-is
+        mergedReminders.push(existing)
+        log(`Preserving completed reminder: "${existing.reminderText}" at ${existing.dateTime}`)
+      } else {
+        // Add new reminder or update existing non-completed one
+        mergedReminders.push(newReminder)
+      }
+    }
+    
+    // Add any existing completed reminders that are not in the new list
+    for (const existing of existingReminders) {
+      if (existing.completed === true) {
+        const stillExists = remindersPayload.reminders.some(r => r.dateTime === existing.dateTime)
+        if (!stillExists) {
+          // Keep completed reminders even if they're not in the new list
+          mergedReminders.push(existing)
+          log(`Preserving completed reminder not in new list: "${existing.reminderText}" at ${existing.dateTime}`)
+        }
+      }
+    }
+    
     const newState: StateFile = {
       ...state,
-      reminders: remindersPayload.reminders,
+      reminders: mergedReminders,
       lastRun: nowIso,
       lastContextMtimeMs: currentMtimeMs,
+      notesFolderPath: notesFolderPath,
     }
 
     await writeFile(STATE_PATH, JSON.stringify(newState, null, 2), 'utf-8')
@@ -152,14 +193,19 @@ Output MUST be a single JSON object with this exact structure:
 Do not include any extra fields. Do not include comments or explanations.
 `
 
+  const currentTimeISO = new Date().toISOString()
   const userPrompt = `
+Current local time (ISO format): ${currentTimeISO}
+
+Set the next reminder as early as possible after the current local time.
+
 Here is the content of CONTEXT.md:
 
 ---
 ${contextText}
 ---
 
-Extract reminders according to the required JSON schema.
+Extract reminders according to the required JSON schema. Use the current time provided above as a reference when interpreting relative times in the CONTEXT.md file.
 `
 
   try {

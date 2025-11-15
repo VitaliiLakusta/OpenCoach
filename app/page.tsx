@@ -68,14 +68,139 @@ export default function Home() {
     // Run immediately once when folder is set/changed
     runOnce()
 
-    // Then run every minute
-    const intervalId = setInterval(runOnce, 60_000)
+    // Then run every 10 seconds
+    const intervalId = setInterval(runOnce, 10_000)
 
     return () => {
       console.log('[RemindersClient] Stopping polling for folder:', folder)
       clearInterval(intervalId)
     }
   }, [notesFolderPath])
+
+  // Check for due reminders every 10 seconds and fire notifications
+  useEffect(() => {
+    if (notificationPermission !== 'granted') {
+      return
+    }
+
+    console.log('[RemindersCheck] Starting reminder check polling every 10 seconds')
+
+    const checkDueReminders = async () => {
+      try {
+        const res = await fetch('/api/reminders/check', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        })
+        const json = await res.json().catch(() => null)
+        
+        if (!json || !json.ok) {
+          console.error('[RemindersCheck] Error response:', json)
+          return
+        }
+
+        const dueReminders = json.dueReminders || []
+        const notesFolderPathFromState = json.notesFolderPath
+
+        if (dueReminders.length > 0) {
+          console.log(`[RemindersCheck] Found ${dueReminders.length} due reminder(s), firing notifications...`)
+          
+          const firedReminderDateTimes: string[] = []
+          
+          // Fire notifications for each due reminder
+          for (const reminder of dueReminders) {
+            try {
+              if (typeof window !== 'undefined' && 'Notification' in window) {
+                const notification = new Notification('OpenCoach', {
+                  body: reminder.reminderText,
+                  requireInteraction: true,
+                  silent: false,
+                })
+                
+                notification.onclick = () => {
+                  console.log('✅ Reminder notification clicked:', reminder.reminderText)
+                  window.focus()
+                  notification.close()
+                }
+                
+                notification.onshow = () => {
+                  console.log('✅✅✅ Reminder notification SHOWN:', reminder.reminderText)
+                }
+                
+                notification.onerror = (error) => {
+                  console.error('❌ Reminder notification error:', error, reminder)
+                }
+                
+                console.log(`[RemindersCheck] Fired notification: "${reminder.reminderText}"`)
+                firedReminderDateTimes.push(reminder.dateTime)
+              }
+            } catch (error) {
+              console.error('[RemindersCheck] Error firing notification:', error, reminder)
+            }
+          }
+
+          // Mark fired reminders as completed (await to ensure it completes before re-calculation)
+          if (firedReminderDateTimes.length > 0) {
+            console.log('[RemindersCheck] Marking reminders as completed...')
+            try {
+              const completeRes = await fetch('/api/reminders/complete', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ reminderDateTimes: firedReminderDateTimes }),
+              })
+              const completeJson = await completeRes.json().catch(() => null)
+              console.log('[RemindersCheck] Mark completed result:', completeJson)
+              
+              if (!completeJson || !completeJson.ok) {
+                console.error('[RemindersCheck] Failed to mark reminders as completed, skipping re-calculation')
+                return // Don't re-calculate if marking failed
+              }
+            } catch (error) {
+              console.error('[RemindersCheck] Error marking reminders as completed:', error)
+              return // Don't re-calculate if marking failed
+            }
+          }
+
+          // Re-calculate reminders after firing notifications (only if marking succeeded)
+          // This will preserve completed reminders due to the merge logic
+          if (notesFolderPathFromState) {
+            console.log('[RemindersCheck] Re-calculating reminders after firing notifications...')
+            try {
+              const recalcRes = await fetch('/api/reminders', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ notesFolderPath: notesFolderPathFromState }),
+              })
+              const recalcJson = await recalcRes.json().catch(() => null)
+              console.log('[RemindersCheck] Re-calculation result:', recalcJson)
+            } catch (error) {
+              console.error('[RemindersCheck] Error re-calculating reminders:', error)
+            }
+          } else {
+            console.warn('[RemindersCheck] No notesFolderPath in state, skipping re-calculation')
+          }
+        }
+      } catch (error) {
+        console.error('[RemindersCheck] Error checking due reminders:', error)
+      }
+    }
+
+    // Run immediately once
+    checkDueReminders()
+
+    // Then run every 10 seconds
+    const intervalId = setInterval(checkDueReminders, 10_000)
+
+    return () => {
+      console.log('[RemindersCheck] Stopping reminder check polling')
+      clearInterval(intervalId)
+    }
+  }, [notificationPermission])
 
   return (
     <div style={{ 
