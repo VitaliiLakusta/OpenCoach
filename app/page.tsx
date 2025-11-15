@@ -1,10 +1,15 @@
 'use client'
 
 import { useChat } from 'ai/react'
+import { useState } from 'react'
 
 export default function Home() {
+  const [notesFolderPath, setNotesFolderPath] = useState('')
   const { messages, input, handleInputChange, handleSubmit, isLoading } = useChat({
     api: '/api/chat',
+    body: {
+      notesFolderPath,
+    },
   })
 
   return (
@@ -20,6 +25,28 @@ export default function Home() {
       <h1 style={{ marginBottom: '20px', fontSize: '24px', fontWeight: 'bold' }}>
         OpenCoach
       </h1>
+      
+      <div style={{ marginBottom: '20px', padding: '12px', background: '#f0f0f0', borderRadius: '8px' }}>
+        <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 'bold' }}>
+          Notes Folder Path:
+        </label>
+        <input
+          type="text"
+          value={notesFolderPath}
+          onChange={(e) => setNotesFolderPath(e.target.value)}
+          placeholder="/path/to/your/notes/folder"
+          style={{
+            width: '100%',
+            padding: '8px',
+            border: '1px solid #ddd',
+            borderRadius: '4px',
+            fontSize: '14px',
+          }}
+        />
+        <div style={{ marginTop: '4px', fontSize: '12px', color: '#666' }}>
+          Enter the absolute path to the folder containing your notes
+        </div>
+      </div>
       
       <div style={{ 
         flex: 1, 
