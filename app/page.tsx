@@ -16,8 +16,20 @@ export default function Home() {
     },
   })
 
-  // Load initial state from server on mount
+  // Load initial state from local storage and server on mount
   useEffect(() => {
+    // First, load from local storage for instant display
+    const localIcalAddress = localStorage.getItem('icalCalendarAddress')
+    const localNotesFolderPath = localStorage.getItem('notesFolderPath')
+
+    if (localIcalAddress) {
+      setIcalCalendarAddress(localIcalAddress)
+    }
+    if (localNotesFolderPath) {
+      setNotesFolderPath(localNotesFolderPath)
+    }
+
+    // Then load from server (will override if different)
     const loadState = async () => {
       try {
         const res = await fetch('/api/state')
@@ -25,9 +37,11 @@ export default function Home() {
           const state = await res.json()
           if (state.icalCalendarAddress) {
             setIcalCalendarAddress(state.icalCalendarAddress)
+            localStorage.setItem('icalCalendarAddress', state.icalCalendarAddress)
           }
           if (state.notesFolderPath) {
             setNotesFolderPath(state.notesFolderPath)
+            localStorage.setItem('notesFolderPath', state.notesFolderPath)
           }
         }
       } catch (error) {
