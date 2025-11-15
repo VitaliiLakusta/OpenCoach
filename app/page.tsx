@@ -17,9 +17,8 @@ export default function Home() {
     },
   })
 
-  // Load initial state from local storage and server on mount
+  // Load initial state from local storage on mount
   useEffect(() => {
-    // First, load from local storage for instant display
     const localIcalAddress = localStorage.getItem('icalCalendarAddress')
     const localNotesFolderPath = localStorage.getItem('notesFolderPath')
 
@@ -29,75 +28,18 @@ export default function Home() {
     if (localNotesFolderPath) {
       setNotesFolderPath(localNotesFolderPath)
     }
-
-    // Then load from server (will override if different)
-    const loadState = async () => {
-      try {
-        const res = await fetch('/api/state')
-        if (res.ok) {
-          const state = await res.json()
-          if (state.icalCalendarAddress) {
-            setIcalCalendarAddress(state.icalCalendarAddress)
-            localStorage.setItem('icalCalendarAddress', state.icalCalendarAddress)
-          }
-          if (state.notesFolderPath) {
-            setNotesFolderPath(state.notesFolderPath)
-            localStorage.setItem('notesFolderPath', state.notesFolderPath)
-          }
-        }
-      } catch (error) {
-        console.error('Error loading state:', error)
-      }
-    }
-    loadState()
   }, [])
 
-  // Save iCal calendar address to local storage and server when it changes
+  // Save iCal calendar address to local storage when it changes
   useEffect(() => {
     if (!icalCalendarAddress) return
-
-    // Save to local storage immediately
     localStorage.setItem('icalCalendarAddress', icalCalendarAddress)
-
-    // Save to server with debounce
-    const saveCalendarAddress = async () => {
-      try {
-        await fetch('/api/state', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ icalCalendarAddress }),
-        })
-      } catch (error) {
-        console.error('Error saving calendar address:', error)
-      }
-    }
-
-    const timeoutId = setTimeout(saveCalendarAddress, 500)
-    return () => clearTimeout(timeoutId)
   }, [icalCalendarAddress])
 
-  // Save notes folder path to local storage and server when it changes
+  // Save notes folder path to local storage when it changes
   useEffect(() => {
     if (!notesFolderPath) return
-
-    // Save to local storage immediately
     localStorage.setItem('notesFolderPath', notesFolderPath)
-
-    // Save to server with debounce
-    const saveFolderPath = async () => {
-      try {
-        await fetch('/api/state', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ notesFolderPath }),
-        })
-      } catch (error) {
-        console.error('Error saving notes folder path:', error)
-      }
-    }
-
-    const timeoutId = setTimeout(saveFolderPath, 500)
-    return () => clearTimeout(timeoutId)
   }, [notesFolderPath])
 
   // Check notification permission on mount

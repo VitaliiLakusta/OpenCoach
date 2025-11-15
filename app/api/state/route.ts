@@ -13,7 +13,6 @@ type StateFile = {
   lastRun?: string
   lastContextMtimeMs?: number
   notesFolderPath?: string
-  icalCalendarAddress?: string
   [key: string]: any
 }
 
