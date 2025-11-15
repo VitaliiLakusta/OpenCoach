@@ -47,7 +47,7 @@ Always use the writeToFile tool with mode='append' when adding TODO items. The f
       }
     }
 
-    const systemPrompt = 'You are OpenCoach, an AI coaching assistant. Help the user with their goals and priorities.' + notesContent
+    const systemPrompt = 'You are OpenCoach, an AI coaching assistant. Help the user with their goals and priorities. When creating calendar events, always provide both the Google Calendar link and the .ics file download link so users can add the event to their preferred calendar app.' + notesContent
 
     const result = await streamText({
       model: openai('gpt-3.5-turbo'),
@@ -77,7 +77,7 @@ Always use the writeToFile tool with mode='append' when adding TODO items. The f
           },
         }),
         createGoogleCalendarLink: tool({
-          description: 'Generate a Google Calendar link for creating a calendar event. Use this when the user asks to create a calendar reminder, event, or schedule something. The link can be clicked to add the event to their Google Calendar.',
+          description: 'Generate a Google Calendar link and .ics file for creating a calendar event. Use this when the user asks to create a calendar reminder, event, or schedule something. Returns both a Google Calendar link and an .ics file download link that works with any calendar app (Apple Calendar, Outlook, etc.).',
           parameters: z.object({
             title: z.string().describe('The title/name of the calendar event'),
             startDateTime: z.string().describe('Start date and time in ISO 8601 format (e.g., "2026-01-15T14:00:00Z" for UTC, or "2026-01-15T14:00:00" for local time)'),
@@ -111,10 +111,15 @@ Always use the writeToFile tool with mode='append' when adding TODO items. The f
                 return date.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')
               }
 
+              // Format dates for .ics file (YYYYMMDDTHHmmssZ)
+              const formatICSDate = (date: Date): string => {
+                return date.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')
+              }
+
               const startFormatted = formatGoogleDate(startDate)
               const endFormatted = formatGoogleDate(endDate)
 
-              // Build URL parameters
+              // Build Google Calendar URL parameters
               const params = new URLSearchParams({
                 action: 'TEMPLATE',
                 text: title,
@@ -135,9 +140,62 @@ Always use the writeToFile tool with mode='append' when adding TODO items. The f
 
               const calendarUrl = `https://calendar.google.com/calendar/render?${params.toString()}`
 
+              // Generate .ics file content
+              const icsStart = formatICSDate(startDate)
+              const icsEnd = formatICSDate(endDate)
+              const uid = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}@opencoach`
+              const now = formatICSDate(new Date())
+
+              // Escape special characters in .ics content
+              const escapeICS = (text: string): string => {
+                return text
+                  .replace(/\\/g, '\\\\')
+                  .replace(/;/g, '\\;')
+                  .replace(/,/g, '\\,')
+                  .replace(/\n/g, '\\n')
+              }
+
+              let icsContent = [
+                'BEGIN:VCALENDAR',
+                'VERSION:2.0',
+                'PRODID:-//OpenCoach//Calendar Event//EN',
+                'CALSCALE:GREGORIAN',
+                'METHOD:PUBLISH',
+                'BEGIN:VEVENT',
+                `UID:${uid}`,
+                `DTSTAMP:${now}`,
+                `DTSTART:${icsStart}`,
+                `DTEND:${icsEnd}`,
+                `SUMMARY:${escapeICS(title)}`,
+              ]
+
+              if (description) {
+                icsContent.push(`DESCRIPTION:${escapeICS(description)}`)
+              }
+
+              if (location) {
+                icsContent.push(`LOCATION:${escapeICS(location)}`)
+              }
+
+              if (recurrence) {
+                // Remove "RRULE:" prefix if present, as .ics format expects just the rule
+                const rrule = recurrence.startsWith('RRULE:') ? recurrence.substring(6) : recurrence
+                icsContent.push(`RRULE:${rrule}`)
+              }
+
+              icsContent.push('END:VEVENT')
+              icsContent.push('END:VCALENDAR')
+
+              const icsFileContent = icsContent.join('\r\n')
+
+              // Create data URL for .ics file download
+              const icsDataUrl = `data:text/calendar;charset=utf-8,${encodeURIComponent(icsFileContent)}`
+
               return {
                 success: true,
-                url: calendarUrl,
+                googleCalendarUrl: calendarUrl,
+                icsDataUrl: icsDataUrl,
+                icsFileName: `${title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.ics`,
                 eventDetails: {
                   title,
                   start: startDate.toISOString(),
