@@ -13,7 +13,7 @@ export default function Home() {
     },
   })
 
-  // Request notification permission and show test notification every 10 seconds
+  // Check notification permission on mount
   useEffect(() => {
     // Check if notifications are supported
     if (typeof window === 'undefined' || !('Notification' in window)) {
@@ -22,120 +22,22 @@ export default function Home() {
       return
     }
 
-    const intervalRef: { current: NodeJS.Timeout | null } = { current: null }
-    
-    const requestNotificationPermission = async () => {
+    const checkNotificationPermission = async () => {
       console.log('Current notification permission:', Notification.permission)
       
-      let permission = Notification.permission
-      if (permission === 'default') {
-        permission = await Notification.requestPermission()
-        console.log('Permission requested, result:', permission)
-      }
-      
+      // Just check the current permission, don't request it automatically
+      // User can request permission via the button if needed
+      const permission = Notification.permission
       setNotificationPermission(permission)
       
       if (permission === 'granted') {
-        console.log('Notification permission granted, setting up notifications')
-        
-        // Function to create and show notification
-        const showNotification = (message: string, timestamp?: string) => {
-          try {
-            console.log('Attempting to create notification...', {
-              message,
-              timestamp,
-              pageVisible: document.visibilityState,
-              hasFocus: document.hasFocus()
-            })
-            
-            // Try without icon first to see if that's the issue
-            const notificationOptions: NotificationOptions = {
-              body: message + (timestamp ? ` (${timestamp})` : ''),
-              requireInteraction: true, // Keep it visible until clicked
-              silent: false, // Play sound
-              badge: undefined,
-            }
-            
-            // Only add icon if we can verify it exists, otherwise skip it
-            // Icon might be causing silent failures
-            
-            const notification = new Notification('OpenCoach', notificationOptions)
-            
-            console.log('Notification object created:', {
-              title: notification.title,
-              body: notification.body,
-              timestamp: new Date().toISOString(),
-              dir: notification.dir,
-              lang: notification.lang,
-              tag: notification.tag
-            })
-            
-            // Set up all event handlers before anything else
-            notification.onclick = () => {
-              console.log('✅ Notification clicked!')
-              window.focus()
-              notification.close()
-            }
-            
-            notification.onshow = () => {
-              console.log('✅✅✅ Notification SHOWN successfully!')
-            }
-            
-            notification.onerror = (error) => {
-              console.error('❌ Notification error event fired:', error)
-              console.error('Error details:', {
-                error,
-                type: typeof error,
-                message: error instanceof Error ? error.message : 'Unknown error'
-              })
-            }
-            
-            notification.onclose = () => {
-              console.log('Notification closed event fired')
-            }
-            
-            // Check if notification is actually displayed
-            setTimeout(() => {
-              console.log('Checking notification state after 1 second...')
-              console.log('Notification still exists:', notification)
-            }, 1000)
-            
-            return notification
-          } catch (error) {
-            console.error('❌ Exception creating notification:', error)
-            if (error instanceof Error) {
-              console.error('Error name:', error.name)
-              console.error('Error message:', error.message)
-              console.error('Error stack:', error.stack)
-            }
-            return null
-          }
-        }
-        
-        // Show "hello world" notification immediately
-        showNotification('Hello world', 'initial')
-        
-        // Set up interval to send notification every 10 seconds
-        intervalRef.current = setInterval(() => {
-          const timestamp = new Date().toLocaleTimeString()
-          showNotification('Hello world', timestamp)
-        }, 10000) // 10 seconds
-        
-        console.log('Notification interval set up')
+        console.log('Notification permission is granted')
       } else {
-        console.log('Notification permission denied or not granted')
+        console.log('Notification permission:', permission)
       }
     }
 
-    requestNotificationPermission()
-    
-    // Cleanup interval on unmount
-    return () => {
-      if (intervalRef.current) {
-        console.log('Clearing notification interval')
-        clearInterval(intervalRef.current)
-      }
-    }
+    checkNotificationPermission()
   }, [])
 
   return (
