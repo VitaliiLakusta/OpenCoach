@@ -71,7 +71,16 @@ Always use the writeToFile tool with mode='append' when adding TODO items. The f
       }
     }
 
-    const systemPrompt = 'You are OpenCoach, an AI coaching assistant. Help the user with their goals and priorities. You have access to the user\'s calendar and can fetch information about their schedule using the getCalendarInfo tool when needed. When creating calendar events, always provide both the Google Calendar link and the .ics file download link so users can add the event to their preferred calendar app. CRITICAL: When using the createGoogleCalendarLink tool, the tool returns a "markdownResponse" field with pre-formatted markdown links. You MUST copy and paste the "markdownResponse" value exactly as-is into your response. Do NOT create your own links, modify the URLs, or use localhost URLs. Simply use the markdownResponse field directly.' + notesContent + calendarContent
+    // Build calendar instruction based on whether user has configured a calendar URL
+    let calendarInstruction = ''
+    if (calendarUrl && typeof calendarUrl === 'string' && calendarUrl.trim()) {
+      const userCalendarUrl = calendarUrl.trim().replace(/^webcal:\/\//, 'https://')
+      calendarInstruction = ` You have access to the user's calendar via the getCalendarInfo tool. CRITICAL: When using the getCalendarInfo tool, you MUST ONLY use this exact calendar URL: "${userCalendarUrl}". DO NOT make up example URLs, use placeholder URLs, or use any other calendar URL. If you need to fetch calendar information, use ONLY the URL provided above.`
+    } else {
+      calendarInstruction = ' The user has not configured a calendar URL yet. You do NOT have access to the getCalendarInfo tool until they provide a calendar URL in the settings.'
+    }
+
+    const systemPrompt = 'You are OpenCoach, an AI coaching assistant. Help the user with their goals and priorities.' + calendarInstruction + ' When creating calendar events, always provide both the Google Calendar link and the .ics file download link so users can add the event to their preferred calendar app. CRITICAL: When using the createGoogleCalendarLink tool, the tool returns a "markdownResponse" field with pre-formatted markdown links. You MUST copy and paste the "markdownResponse" value exactly as-is into your response. Do NOT create your own links, modify the URLs, or use localhost URLs. Simply use the markdownResponse field directly.' + notesContent + calendarContent
 
     const result = await streamText({
       model: openai('gpt-3.5-turbo'),
@@ -80,13 +89,21 @@ Always use the writeToFile tool with mode='append' when adding TODO items. The f
       maxSteps: 5, // Allow multiple tool calls and responses
       tools: {
         getCalendarInfo: tool({
-          description: 'Fetch and parse calendar information from an iCal calendar URL. Use this to get information about upcoming events, meetings, and schedule. The calendar URL should be an iCal/webcal subscription link (e.g., from Google Calendar, Apple Calendar, Outlook). This provides context about the user\'s schedule to help with planning, scheduling conflicts, and time management.',
+          description: 'Fetch and parse calendar information from the user\'s configured iCal calendar URL. Use this to get information about upcoming events, meetings, and schedule. IMPORTANT: You must ONLY use the exact calendar URL that was provided in the system prompt. Do NOT use example URLs, placeholder URLs, or make up calendar URLs.',
           parameters: z.object({
-            calendarUrl: z.string().describe('The iCal calendar subscription URL (webcal:// or https:// URL to .ics file)'),
+            calendarUrl: z.string().describe('MUST be the exact calendar URL provided in the system prompt. Do NOT use example.com or any placeholder URL.'),
             maxEvents: z.number().optional().default(10).describe('Maximum number of events to include in each section (default: 10)')
           }),
           execute: async ({ calendarUrl, maxEvents }) => {
             try {
+              // Validate that this is not an example/placeholder URL
+              if (calendarUrl.includes('example.com') || calendarUrl.includes('placeholder') || calendarUrl.includes('your-calendar')) {
+                return {
+                  success: false,
+                  error: 'Invalid calendar URL. You must use the actual calendar URL provided by the user, not an example or placeholder URL. Check the system prompt for the correct calendar URL.',
+                }
+              }
+
               // Convert webcal:// to https://
               const httpUrl = calendarUrl.replace(/^webcal:\/\//, 'https://')
 
