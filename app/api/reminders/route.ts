@@ -224,7 +224,6 @@ Extract reminders according to the required JSON schema. Use the current time pr
           { role: 'user', content: userPrompt },
         ],
         response_format: { type: 'json_object' },
-        temperature: 0,
       }),
     })
 

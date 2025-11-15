@@ -83,9 +83,10 @@ Always use the writeToFile tool with mode='append' when adding TODO items. The f
     const systemPrompt = 'You are OpenCoach, an AI coaching assistant. Help the user with their goals and priorities.' + calendarInstruction + ' When creating calendar events, always provide both the Google Calendar link and the .ics file download link so users can add the event to their preferred calendar app. CRITICAL: When using the createGoogleCalendarLink tool, the tool returns a "markdownResponse" field with pre-formatted markdown links. You MUST copy and paste the "markdownResponse" value exactly as-is into your response. Do NOT create your own links, modify the URLs, or use localhost URLs. Simply use the markdownResponse field directly.' + notesContent + calendarContent
 
     const result = await streamText({
-      model: openai('gpt-3.5-turbo'),
+      model: openai('gpt-5-mini'),
       messages,
       system: systemPrompt,
+      temperature: 1, // GPT-5 models only support temperature: 1 (default), not 0
       maxSteps: 5, // Allow multiple tool calls and responses
       tools: {
         getCalendarInfo: tool({
