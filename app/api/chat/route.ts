@@ -76,6 +76,82 @@ Always use the writeToFile tool with mode='append' when adding TODO items. The f
             }
           },
         }),
+        createGoogleCalendarLink: tool({
+          description: 'Generate a Google Calendar link for creating a calendar event. Use this when the user asks to create a calendar reminder, event, or schedule something. The link can be clicked to add the event to their Google Calendar.',
+          parameters: z.object({
+            title: z.string().describe('The title/name of the calendar event'),
+            startDateTime: z.string().describe('Start date and time in ISO 8601 format (e.g., "2026-01-15T14:00:00Z" for UTC, or "2026-01-15T14:00:00" for local time)'),
+            endDateTime: z.string().optional().describe('End date and time in ISO 8601 format. If not provided, defaults to 1 hour after start time. For all-day events, use the same date for start and end.'),
+            description: z.string().optional().describe('Event description or notes'),
+            location: z.string().optional().describe('Event location'),
+            recurrence: z.string().optional().describe('Recurrence rule for recurring events. Use RRULE format, e.g., "RRULE:FREQ=DAILY" for daily, "RRULE:FREQ=WEEKLY;BYDAY=MO,WE,FR" for specific days')
+          }),
+          execute: async ({ title, startDateTime, endDateTime, description, location, recurrence }) => {
+            try {
+              // Parse start date
+              const startDate = new Date(startDateTime)
+              if (isNaN(startDate.getTime())) {
+                return { success: false, error: 'Invalid start date format' }
+              }
+
+              // Parse or calculate end date
+              let endDate: Date
+              if (endDateTime) {
+                endDate = new Date(endDateTime)
+                if (isNaN(endDate.getTime())) {
+                  return { success: false, error: 'Invalid end date format' }
+                }
+              } else {
+                // Default to 1 hour after start
+                endDate = new Date(startDate.getTime() + 60 * 60 * 1000)
+              }
+
+              // Format dates for Google Calendar (YYYYMMDDTHHmmssZ)
+              const formatGoogleDate = (date: Date): string => {
+                return date.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')
+              }
+
+              const startFormatted = formatGoogleDate(startDate)
+              const endFormatted = formatGoogleDate(endDate)
+
+              // Build URL parameters
+              const params = new URLSearchParams({
+                action: 'TEMPLATE',
+                text: title,
+                dates: `${startFormatted}/${endFormatted}`,
+              })
+
+              if (description) {
+                params.append('details', description)
+              }
+
+              if (location) {
+                params.append('location', location)
+              }
+
+              if (recurrence) {
+                params.append('recur', recurrence)
+              }
+
+              const calendarUrl = `https://calendar.google.com/calendar/render?${params.toString()}`
+
+              return {
+                success: true,
+                url: calendarUrl,
+                eventDetails: {
+                  title,
+                  start: startDate.toISOString(),
+                  end: endDate.toISOString(),
+                  description,
+                  location,
+                  recurrence
+                }
+              }
+            } catch (error) {
+              return { success: false, error: `Failed to create calendar link: ${error}` }
+            }
+          },
+        }),
       },
     })
 
