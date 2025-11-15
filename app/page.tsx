@@ -4,6 +4,7 @@ import { useChat } from 'ai/react'
 import { useState, useEffect } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import Image from 'next/image'
 import { AVAILABLE_MODELS, DEFAULT_MODEL, type ModelConfig } from '@/lib/models'
 
 export default function Home() {
@@ -251,11 +252,12 @@ export default function Home() {
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-xl shadow-lg">
-                O
+              <div className="rounded-xl shadow-lg flex items-center justify-center bg-white p-1">
+                <Image src="/logo.png" alt="OpenCoach Logo" width={40} height={40} className="object-contain" />
               </div>
-              <h1 className="text-2xl font-semibold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                OpenCoach
+              <h1 className="text-2xl font-semibold">
+                <span className="text-xl bg-gradient-to-r from-gray-800 via-black to-gray-900 bg-clip-text text-transparent">open</span>
+                <span className="bg-gradient-to-r from-gray-800 via-black to-gray-900 bg-clip-text text-transparent"> Coach</span>
               </h1>
             </div>
           </div>
@@ -435,10 +437,10 @@ export default function Home() {
         {messages.length === 0 && (
           <div className="h-full flex items-center justify-center">
             <div className="text-center space-y-4">
-              <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-3xl shadow-lg">
-                O
+              <div className="mx-auto rounded-2xl shadow-lg flex items-center justify-center bg-white p-2">
+                <Image src="/logo.png" alt="OpenCoach Logo" width={64} height={64} className="object-contain" />
               </div>
-              <h2 className="text-2xl font-semibold text-slate-800">Welcome to OpenCoach</h2>
+              <h2 className="text-2xl font-semibold text-slate-800">Welcome to open Coach</h2>
               <p className="text-slate-500 max-w-md">
                 Start a conversation with your AI coaching assistant. Ask questions, share thoughts, or get guidance on your goals.
               </p>
@@ -453,8 +455,8 @@ export default function Home() {
               className={`flex gap-4 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
             >
               {message.role === 'assistant' && (
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm shadow-md flex-shrink-0 mt-1">
-                  O
+                <div className="rounded-lg shadow-md flex items-center justify-center bg-white flex-shrink-0 mt-1 p-0.5">
+                  <Image src="/logo.png" alt="OpenCoach" width={32} height={32} className="object-contain" />
                 </div>
               )}
               
@@ -590,8 +592,8 @@ export default function Home() {
           
           {isLoading && (
             <div className="flex gap-4 justify-start">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm shadow-md flex-shrink-0">
-                O
+              <div className="rounded-lg shadow-md flex items-center justify-center bg-white flex-shrink-0 p-0.5">
+                <Image src="/logo.png" alt="OpenCoach" width={32} height={32} className="object-contain" />
               </div>
               <div className="bg-white border border-slate-200 px-5 py-3.5 rounded-2xl shadow-sm">
                 <div className="flex items-center gap-2">
