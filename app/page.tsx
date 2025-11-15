@@ -2,6 +2,8 @@
 
 import { useChat } from 'ai/react'
 import { useState, useEffect } from 'react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 
 export default function Home() {
   const [notesFolderPath, setNotesFolderPath] = useState('')
@@ -388,9 +390,17 @@ export default function Home() {
                     }
                   `}
                 >
-                  <div className="text-sm leading-relaxed whitespace-pre-wrap break-words">
-                    {message.content}
-                  </div>
+                  {message.role === 'assistant' ? (
+                    <div className="text-sm leading-relaxed prose prose-sm max-w-none prose-a:text-blue-600 prose-a:no-underline hover:prose-a:underline">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                        {message.content}
+                      </ReactMarkdown>
+                    </div>
+                  ) : (
+                    <div className="text-sm leading-relaxed whitespace-pre-wrap break-words">
+                      {message.content}
+                    </div>
+                  )}
                 </div>
               </div>
               

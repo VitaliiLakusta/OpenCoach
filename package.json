@@ -12,10 +12,13 @@
     "@ai-sdk/openai": "^0.0.50",
     "@mastra/core": "^0.1.0",
     "@next/swc-darwin-arm64": "^16.0.3",
+    "@tailwindcss/typography": "^0.5.19",
     "ai": "^3.0.0",
     "next": "^14.0.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
     "zod": "^3.23.8"
   },
   "devDependencies": {
