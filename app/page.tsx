@@ -7,6 +7,7 @@ import remarkGfm from 'remark-gfm'
 
 export default function Home() {
   const [notesFolderPath, setNotesFolderPath] = useState('')
+  const [icalCalendarAddress, setIcalCalendarAddress] = useState('')
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission | 'checking' | 'unsupported'>('checking')
   const { messages, input, handleInputChange, handleSubmit, isLoading } = useChat({
     api: '/api/chat',
@@ -14,6 +15,47 @@ export default function Home() {
       notesFolderPath,
     },
   })
+
+  // Load initial state from server on mount
+  useEffect(() => {
+    const loadState = async () => {
+      try {
+        const res = await fetch('/api/state')
+        if (res.ok) {
+          const state = await res.json()
+          if (state.icalCalendarAddress) {
+            setIcalCalendarAddress(state.icalCalendarAddress)
+          }
+          if (state.notesFolderPath) {
+            setNotesFolderPath(state.notesFolderPath)
+          }
+        }
+      } catch (error) {
+        console.error('Error loading state:', error)
+      }
+    }
+    loadState()
+  }, [])
+
+  // Save iCal calendar address to state when it changes
+  useEffect(() => {
+    if (!icalCalendarAddress) return
+
+    const saveCalendarAddress = async () => {
+      try {
+        await fetch('/api/state', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ icalCalendarAddress }),
+        })
+      } catch (error) {
+        console.error('Error saving calendar address:', error)
+      }
+    }
+
+    const timeoutId = setTimeout(saveCalendarAddress, 500)
+    return () => clearTimeout(timeoutId)
+  }, [icalCalendarAddress])
 
   // Check notification permission on mount
   useEffect(() => {
@@ -26,12 +68,12 @@ export default function Home() {
 
     const checkNotificationPermission = async () => {
       console.log('Current notification permission:', Notification.permission)
-      
+
       // Just check the current permission, don't request it automatically
       // User can request permission via the button if needed
       const permission = Notification.permission
       setNotificationPermission(permission)
-      
+
       if (permission === 'granted') {
         console.log('Notification permission is granted')
       } else {
@@ -346,6 +388,23 @@ export default function Home() {
               />
               <p className="text-xs text-slate-500 mt-2">
                 Enter the absolute path to the folder containing your notes
+              </p>
+            </div>
+
+            {/* iCal Calendar Address */}
+            <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
+              <label className="block text-sm font-semibold text-slate-800 mb-3">
+                iCal Calendar Address
+              </label>
+              <input
+                type="url"
+                value={icalCalendarAddress}
+                onChange={(e) => setIcalCalendarAddress(e.target.value)}
+                placeholder="https://calendar.google.com/calendar/ical/..."
+                className="w-full px-4 py-2.5 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all duration-200"
+              />
+              <p className="text-xs text-slate-500 mt-2">
+                Enter your iCal/ICS calendar feed URL for calendar integration
               </p>
             </div>
           </div>
