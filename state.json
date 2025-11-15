@@ -1,18 +1,19 @@
 {
   "reminders": [
     {
+      "dateTime": "2025-11-15T15:00:00",
+      "reminderText": "Journal your exercises to Strava"
+    },
+    {
       "dateTime": "2025-11-16T09:00:00",
       "reminderText": "Reflect on exercising"
     },
     {
       "dateTime": "2025-11-16T18:00:00",
       "reminderText": "Reflect in the evening"
-    },
-    {
-      "dateTime": "2025-11-16T13:00:00",
-      "reminderText": "Exercise"
     }
   ],
-  "lastRun": "2025-11-15T13:50:23.407Z",
-  "lastContextMtimeMs": 1763214598894.8723
+  "lastRun": "2025-11-15T14:39:30.666Z",
+  "lastContextMtimeMs": 1763217326149.344,
+  "notesFolderPath": "/Users/alc/ObsidianFiles/FitnessPlan"
 }

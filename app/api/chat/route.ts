@@ -53,9 +53,10 @@ Always use the writeToFile tool with mode='append' when adding TODO items. The f
       model: openai('gpt-3.5-turbo'),
       messages,
       system: systemPrompt,
+      maxSteps: 5, // Allow multiple tool calls and responses
       tools: {
         writeToFile: tool({
-          description: 'Write or append content to a note file. Use this when the user asks to add something to their notes, TODO list, or any file.',
+          description: 'Write or append content to a note file. Use this when the user asks to add something to their notes, TODO list, or any file. IMPORTANT: After using this tool, you MUST confirm to the user what was done and which file was modified.',
           parameters: z.object({
             filePath: z.string().describe('The full path to the file to write to'),
             content: z.string().describe('The content to append to the file'),

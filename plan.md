@@ -34,4 +34,4 @@ Agent should be aware and find the most relevant note for today (could be the mo
 
 
 
-  4. So, now we have state.json and "reminders" are there. We want to have a loop which runs every 10 seconds and checks if a notification needs to be sent, based on each reminder dateTime. If current time is equal or greater than reminder's time, fire the notification. As you fire notification, re-calculate the reminders and update state.json accordingly.
+  4. [DONE] So, now we have state.json and "reminders" are there. We want to have a loop which runs every 10 seconds and checks if a notification needs to be sent, based on each reminder dateTime. If current time is equal or greater than reminder's time, fire the notification. As you fire notification, re-calculate the reminders and update state.json accordingly.
