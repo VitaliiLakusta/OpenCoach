@@ -57,6 +57,26 @@ export default function Home() {
     return () => clearTimeout(timeoutId)
   }, [icalCalendarAddress])
 
+  // Save notes folder path to state when it changes
+  useEffect(() => {
+    if (!notesFolderPath) return
+
+    const saveFolderPath = async () => {
+      try {
+        await fetch('/api/state', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ notesFolderPath }),
+        })
+      } catch (error) {
+        console.error('Error saving notes folder path:', error)
+      }
+    }
+
+    const timeoutId = setTimeout(saveFolderPath, 500)
+    return () => clearTimeout(timeoutId)
+  }, [notesFolderPath])
+
   // Check notification permission on mount
   useEffect(() => {
     // Check if notifications are supported
