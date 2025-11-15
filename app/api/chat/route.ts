@@ -1,4 +1,4 @@
-import { openai } from '@ai-sdk/openai'
+import { openai, createOpenAI } from '@ai-sdk/openai'
 import { streamText, tool } from 'ai'
 import { readdir, readFile, stat, writeFile, appendFile } from 'fs/promises'
 import { join } from 'path'
@@ -35,6 +35,20 @@ async function loadProvider(providerName: string) {
 // Cache for loaded providers
 const providerCache: Record<string, any> = {}
 
+// Create Ollama client instance (will be initialized when needed)
+let ollamaClient: ReturnType<typeof createOpenAI> | null = null
+
+// Helper function to get or create Ollama client
+function getOllamaClient() {
+  if (!ollamaClient) {
+    ollamaClient = createOpenAI({
+      baseURL: 'http://localhost:11434/v1',
+      apiKey: 'ollama', // Ollama doesn't validate this, but the SDK requires it
+    })
+  }
+  return ollamaClient
+}
+
 // Helper function to get the model instance based on model config
 async function getModel(modelId: string) {
   const modelConfig = getModelById(modelId) || getModelById(DEFAULT_MODEL)
@@ -45,6 +59,20 @@ async function getModel(modelId: string) {
   switch (modelConfig.provider) {
     case 'openai':
       return openai(modelConfig.modelId)
+    case 'ollama': {
+      // Use Ollama client with OpenAI-compatible API
+      console.log(`[getModel] Creating Ollama model instance for: ${modelConfig.modelId}`)
+      console.log(`[getModel] Ollama baseURL: ${modelConfig.baseURL || 'http://localhost:11434/v1'}`)
+      try {
+        const ollama = getOllamaClient()
+        const model = ollama(modelConfig.modelId)
+        console.log(`[getModel] ✅ Ollama model instance created successfully`)
+        return model
+      } catch (error) {
+        console.error(`[getModel] ❌ Error creating Ollama model instance:`, error)
+        throw error
+      }
+    }
     case 'anthropic': {
       if (!providerCache.anthropic) {
         providerCache.anthropic = await loadProvider('anthropic')
@@ -165,21 +193,37 @@ Always use the writeToFile tool with mode='append' when adding TODO items. The f
     }
 
     const systemPrompt = 'You are OpenCoach, an AI coaching assistant. Help the user with their goals and priorities.' + calendarInstruction + ' When creating calendar events, always provide both the Google Calendar link and the .ics file download link so users can add the event to their preferred calendar app. CRITICAL: When using the createGoogleCalendarLink tool, the tool returns a "markdownResponse" field with pre-formatted markdown links. You MUST copy and paste the "markdownResponse" value exactly as-is into your response. Do NOT create your own links, modify the URLs, or use localhost URLs. Simply use the markdownResponse field directly.' + notesContent + calendarContent
-
+    
     // Determine temperature based on model (some models like o1/o3 have restrictions)
     const modelConfig = getModelById(modelId) || getModelById(DEFAULT_MODEL)
     const isO1Model = modelConfig?.modelId.startsWith('o1') || modelConfig?.modelId.startsWith('o3')
     const temperature = isO1Model ? 1 : 0.7 // O1/O3 models only support temperature: 1
+    
+    // For Ollama models, add extra instruction to avoid unnecessary tool calls
+    const ollamaExtraPrompt = modelConfig?.provider === 'ollama' 
+      ? ' IMPORTANT: Only use tools when explicitly needed. For simple greetings and conversations, respond directly without using any tools. Only call writeToFile when the user specifically asks to write or add something to their notes.' 
+      : ''
+    
+    const finalSystemPrompt = systemPrompt + ollamaExtraPrompt
 
     // Log which model is being used
     console.log(`[Chat API] Using model: ${modelConfig?.name || modelId} (provider: ${modelConfig?.provider || 'unknown'}, modelId: ${modelConfig?.modelId || modelId})`)
+    
+    // Add extra logging for Ollama models
+    if (modelConfig?.provider === 'ollama') {
+      console.log(`[Chat API] ⚠️ Using LOCAL Ollama model`)
+      console.log(`[Chat API] Make sure Ollama is running: ollama serve`)
+      console.log(`[Chat API] Make sure model is installed: ollama list`)
+    }
 
     const result = await streamText({
       model: modelInstance,
       messages,
-      system: systemPrompt,
+      system: finalSystemPrompt,
       temperature,
       maxSteps: 5, // Allow multiple tool calls and responses
+      // For Ollama models, be more conservative with tool usage
+      ...(modelConfig?.provider === 'ollama' && { toolChoice: 'auto' }),
       tools: {
         getCalendarInfo: tool({
           description: 'Fetch and parse calendar information from the user\'s configured iCal calendar URL. Use this to get information about upcoming events, meetings, and schedule. IMPORTANT: You must ONLY use the exact calendar URL that was provided in the system prompt. Do NOT use example URLs, placeholder URLs, or make up calendar URLs.',
@@ -426,10 +470,19 @@ Always use the writeToFile tool with mode='append' when adding TODO items. The f
       },
     })
 
+    console.log(`[Chat API] streamText result created, streaming response...`)
+
     return result.toDataStreamResponse()
   } catch (error) {
-    console.error('Error in chat API:', error)
-    return new Response('Internal Server Error', { status: 500 })
+    console.error('[Chat API] ❌ Error in chat API:', error)
+    if (error instanceof Error) {
+      console.error('[Chat API] Error message:', error.message)
+      console.error('[Chat API] Error stack:', error.stack)
+    }
+    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : 'Internal Server Error' }), { 
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    })
   }
 }
 
