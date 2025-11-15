@@ -493,7 +493,7 @@ export default function Home() {
             {/* Notes Folder Path */}
             <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
               <label className="block text-sm font-semibold text-slate-800 mb-3">
-                Notes Folder Root
+                Obsidian Notes Folder Root
               </label>
               <input
                 type="text"
@@ -565,7 +565,9 @@ export default function Home() {
         )}
         
         <div className="space-y-6">
-          {messages.map((message, index) => (
+          {messages
+            .filter((message) => message.content && message.content.trim() !== '')
+            .map((message) => (
             <div
               key={message.id}
               className={`flex gap-4 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
@@ -575,13 +577,13 @@ export default function Home() {
                   <Image src="/logo.png" alt="OpenCoach" width={32} height={32} className="object-contain" />
                 </div>
               )}
-              
+
               <div className={`flex flex-col max-w-3xl ${message.role === 'user' ? 'items-end' : 'items-start'}`}>
                 <div
                   className={`
                     px-5 py-3.5 rounded-2xl shadow-sm
-                    ${message.role === 'user' 
-                      ? 'bg-gradient-to-br from-blue-600 to-blue-700 text-white' 
+                    ${message.role === 'user'
+                      ? 'bg-gradient-to-br from-blue-600 to-blue-700 text-white'
                       : 'bg-white border border-slate-200 text-slate-800'
                     }
                   `}
