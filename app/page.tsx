@@ -40,6 +40,43 @@ export default function Home() {
     checkNotificationPermission()
   }, [])
 
+  // Start reminders polling once a notes folder path is set
+  useEffect(() => {
+    if (!notesFolderPath || !notesFolderPath.trim()) {
+      return
+    }
+
+    const folder = notesFolderPath.trim()
+    console.log('[RemindersClient] Starting polling for CONTEXT.md in folder:', folder)
+
+    const runOnce = async () => {
+      try {
+        const res = await fetch('/api/reminders', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ notesFolderPath: folder }),
+        })
+        const json = await res.json().catch(() => null)
+        console.log('[RemindersClient] Reminders tick result:', json)
+      } catch (error) {
+        console.error('[RemindersClient] Error calling /api/reminders:', error)
+      }
+    }
+
+    // Run immediately once when folder is set/changed
+    runOnce()
+
+    // Then run every minute
+    const intervalId = setInterval(runOnce, 60_000)
+
+    return () => {
+      console.log('[RemindersClient] Stopping polling for folder:', folder)
+      clearInterval(intervalId)
+    }
+  }, [notesFolderPath])
+
   return (
     <div style={{ 
       display: 'flex', 

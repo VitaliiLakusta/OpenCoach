@@ -1,0 +1,22 @@
+{
+  "reminders": [
+    {
+      "dateTime": "2025-11-16T09:00:00",
+      "reminderText": "Reflect on exercising"
+    },
+    {
+      "dateTime": "2025-11-16T18:00:00",
+      "reminderText": "Reflect in the evening"
+    },
+    {
+      "dateTime": "2025-11-16T13:00:00",
+      "reminderText": "Exercise"
+    },
+    {
+      "dateTime": "2025-11-19T09:00:00",
+      "reminderText": "Reflect on weekly goals"
+    }
+  ],
+  "lastRun": "2025-11-15T13:44:59.503Z",
+  "lastContextMtimeMs": 1763214253752.059
+}
