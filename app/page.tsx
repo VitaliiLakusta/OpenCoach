@@ -320,21 +320,6 @@ export default function Home() {
             <p className="text-xs text-slate-500 mt-1">Select a space to work in</p>
           </div>
           <div className="flex-1 overflow-y-auto p-2">
-            {/* "All Notes" option to use base folder */}
-            <button
-              onClick={() => setSelectedSpace(null)}
-              className={`w-full text-left px-3 py-2 rounded-lg mb-1 transition-colors duration-150 ${
-                !selectedSpace
-                  ? 'bg-blue-100 text-blue-800 font-medium'
-                  : 'text-slate-700 hover:bg-slate-100'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <span className="text-lg">📁</span>
-                <span className="text-sm">All Notes</span>
-              </div>
-            </button>
-
             {loadingSpaces ? (
               <div className="flex items-center justify-center py-4">
                 <div className="text-sm text-slate-500">Loading...</div>
