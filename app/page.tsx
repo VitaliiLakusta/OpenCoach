@@ -4,16 +4,19 @@ import { useChat } from 'ai/react'
 import { useState, useEffect } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import { AVAILABLE_MODELS, DEFAULT_MODEL, type ModelConfig } from '@/lib/models'
 
 export default function Home() {
   const [notesFolderPath, setNotesFolderPath] = useState('')
   const [icalCalendarAddress, setIcalCalendarAddress] = useState('')
+  const [selectedModel, setSelectedModel] = useState<string>(DEFAULT_MODEL)
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission | 'checking' | 'unsupported'>('checking')
   const { messages, input, handleInputChange, handleSubmit, isLoading } = useChat({
     api: '/api/chat',
     body: {
       notesFolderPath,
       calendarUrl: icalCalendarAddress,
+      model: selectedModel,
     },
   })
 
@@ -21,12 +24,16 @@ export default function Home() {
   useEffect(() => {
     const localIcalAddress = localStorage.getItem('icalCalendarAddress')
     const localNotesFolderPath = localStorage.getItem('notesFolderPath')
+    const localSelectedModel = localStorage.getItem('selectedModel')
 
     if (localIcalAddress) {
       setIcalCalendarAddress(localIcalAddress)
     }
     if (localNotesFolderPath) {
       setNotesFolderPath(localNotesFolderPath)
+    }
+    if (localSelectedModel) {
+      setSelectedModel(localSelectedModel)
     }
   }, [])
 
@@ -41,6 +48,12 @@ export default function Home() {
     if (!notesFolderPath) return
     localStorage.setItem('notesFolderPath', notesFolderPath)
   }, [notesFolderPath])
+
+  // Save selected model to local storage when it changes
+  useEffect(() => {
+    if (!selectedModel) return
+    localStorage.setItem('selectedModel', selectedModel)
+  }, [selectedModel])
 
   // Check notification permission on mount
   useEffect(() => {
@@ -390,6 +403,27 @@ export default function Home() {
               />
               <p className="text-xs text-slate-500 mt-2">
                 Enter your iCal/ICS calendar feed URL for calendar integration
+              </p>
+            </div>
+
+            {/* Model Selection */}
+            <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
+              <label className="block text-sm font-semibold text-slate-800 mb-3">
+                AI Model
+              </label>
+              <select
+                value={selectedModel}
+                onChange={(e) => setSelectedModel(e.target.value)}
+                className="w-full px-4 py-2.5 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all duration-200 bg-white"
+              >
+                {AVAILABLE_MODELS.map((model) => (
+                  <option key={model.id} value={model.id}>
+                    {model.name}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-slate-500 mt-2">
+                Select the AI model to use for conversations. Make sure you have the appropriate API keys configured.
               </p>
             </div>
           </div>

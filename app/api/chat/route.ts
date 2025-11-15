@@ -4,12 +4,96 @@ import { readdir, readFile, stat, writeFile, appendFile } from 'fs/promises'
 import { join } from 'path'
 import { z } from 'zod'
 import { parseICalFromUrl, formatCalendarSummary } from '@/lib/calendar'
+import { getModelById, DEFAULT_MODEL } from '@/lib/models'
+
+// Helper function to dynamically load provider modules
+// These are optional dependencies - if not installed, they will gracefully fail
+async function loadProvider(providerName: string) {
+  try {
+    // Use require() for optional dependencies since webpack's IgnorePlugin
+    // prevents them from being bundled, but they can still be required at runtime
+    const modulePath = `@ai-sdk/${providerName}`
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const module = require(modulePath)
+    
+    switch (providerName) {
+      case 'anthropic':
+        return module.anthropic
+      case 'google':
+        return module.google
+      case 'mistral':
+        return module.mistral
+      default:
+        return null
+    }
+  } catch (e) {
+    console.warn(`@ai-sdk/${providerName} not installed. ${providerName} models will not be available.`)
+    return null
+  }
+}
+
+// Cache for loaded providers
+const providerCache: Record<string, any> = {}
+
+// Helper function to get the model instance based on model config
+async function getModel(modelId: string) {
+  const modelConfig = getModelById(modelId) || getModelById(DEFAULT_MODEL)
+  if (!modelConfig) {
+    throw new Error(`Model ${modelId} not found`)
+  }
+
+  switch (modelConfig.provider) {
+    case 'openai':
+      return openai(modelConfig.modelId)
+    case 'anthropic': {
+      if (!providerCache.anthropic) {
+        providerCache.anthropic = await loadProvider('anthropic')
+      }
+      if (!providerCache.anthropic) {
+        throw new Error('Anthropic provider not available. Please install @ai-sdk/anthropic')
+      }
+      return providerCache.anthropic(modelConfig.modelId)
+    }
+    case 'google': {
+      if (!providerCache.google) {
+        providerCache.google = await loadProvider('google')
+      }
+      if (!providerCache.google) {
+        throw new Error('Google provider not available. Please install @ai-sdk/google')
+      }
+      return providerCache.google(modelConfig.modelId)
+    }
+    case 'mistral': {
+      if (!providerCache.mistral) {
+        providerCache.mistral = await loadProvider('mistral')
+      }
+      if (!providerCache.mistral) {
+        throw new Error('Mistral provider not available. Please install @ai-sdk/mistral')
+      }
+      return providerCache.mistral(modelConfig.modelId)
+    }
+    default:
+      throw new Error(`Unknown provider: ${modelConfig.provider}`)
+  }
+}
 
 // For bare minimum prototype, using OpenAI directly via Vercel AI SDK
 // This will be replaced with Mastra agent integration later
 export async function POST(req: Request) {
   try {
-    const { messages, notesFolderPath, calendarUrl } = await req.json()
+    const { messages, notesFolderPath, calendarUrl, model: selectedModelId } = await req.json()
+    
+    // Get the model instance based on selection (defaults to DEFAULT_MODEL if not provided)
+    const modelId = selectedModelId || DEFAULT_MODEL
+    let modelInstance
+    try {
+      modelInstance = await getModel(modelId)
+    } catch (error) {
+      console.error(`Error loading model ${modelId}:`, error)
+      // Fallback to default OpenAI model
+      modelInstance = openai('gpt-4o-mini')
+      console.warn(`Falling back to default model: gpt-4o-mini`)
+    }
 
     let notesContent = ''
     let fileMetadata: Array<{ name: string; path: string; mtime: Date }> = []
@@ -82,11 +166,19 @@ Always use the writeToFile tool with mode='append' when adding TODO items. The f
 
     const systemPrompt = 'You are OpenCoach, an AI coaching assistant. Help the user with their goals and priorities.' + calendarInstruction + ' When creating calendar events, always provide both the Google Calendar link and the .ics file download link so users can add the event to their preferred calendar app. CRITICAL: When using the createGoogleCalendarLink tool, the tool returns a "markdownResponse" field with pre-formatted markdown links. You MUST copy and paste the "markdownResponse" value exactly as-is into your response. Do NOT create your own links, modify the URLs, or use localhost URLs. Simply use the markdownResponse field directly.' + notesContent + calendarContent
 
+    // Determine temperature based on model (some models like o1/o3 have restrictions)
+    const modelConfig = getModelById(modelId) || getModelById(DEFAULT_MODEL)
+    const isO1Model = modelConfig?.modelId.startsWith('o1') || modelConfig?.modelId.startsWith('o3')
+    const temperature = isO1Model ? 1 : 0.7 // O1/O3 models only support temperature: 1
+
+    // Log which model is being used
+    console.log(`[Chat API] Using model: ${modelConfig?.name || modelId} (provider: ${modelConfig?.provider || 'unknown'}, modelId: ${modelConfig?.modelId || modelId})`)
+
     const result = await streamText({
-      model: openai('gpt-5-mini'),
+      model: modelInstance,
       messages,
       system: systemPrompt,
-      temperature: 1, // GPT-5 models only support temperature: 1 (default), not 0
+      temperature,
       maxSteps: 5, // Allow multiple tool calls and responses
       tools: {
         getCalendarInfo: tool({
