@@ -1,3 +1,7 @@
+## Important Git Instructions
+
+**CRITICAL: NEVER run `git push` automatically without explicit user permission.** Always ask the user before pushing changes to the remote repository. You may stage and commit changes, but pushing requires explicit approval from the user.
+
 ## Context of the project
 
 The project is OpenCoach. OpenCoach accesses your notes. You give OpenCoach your context, in a special file called CONTEXT.md, where you write it your goals, priorities, and how you want OpenCoach to help you, for example you can ask OpenCoach to send you notifications every morning to help you reflect on your day and plan it ahead, or reflect on Friday on your whole week.
