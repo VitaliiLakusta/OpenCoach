@@ -573,7 +573,7 @@ export default function Home() {
               className={`flex gap-4 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
             >
               {message.role === 'assistant' && (
-                <div className="rounded-lg shadow-md flex items-center justify-center bg-white flex-shrink-0 mt-1 p-0.5">
+                <div className="w-8 h-8 rounded-lg shadow-md flex items-center justify-center bg-white flex-shrink-0 mt-1">
                   <Image src="/logo.png" alt="OpenCoach" width={32} height={32} className="object-contain" />
                 </div>
               )}
