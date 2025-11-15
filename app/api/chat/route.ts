@@ -3,16 +3,17 @@ import { streamText, tool } from 'ai'
 import { readdir, readFile, stat, writeFile, appendFile } from 'fs/promises'
 import { join } from 'path'
 import { z } from 'zod'
+import { parseICalFromUrl, formatCalendarSummary } from '@/lib/calendar'
 
 // For bare minimum prototype, using OpenAI directly via Vercel AI SDK
 // This will be replaced with Mastra agent integration later
 export async function POST(req: Request) {
   try {
-    const { messages, notesFolderPath } = await req.json()
+    const { messages, notesFolderPath, calendarUrl } = await req.json()
 
     let notesContent = ''
     let fileMetadata: Array<{ name: string; path: string; mtime: Date }> = []
-    
+
     // If folder path is provided, read all notes from it
     if (notesFolderPath && typeof notesFolderPath === 'string' && notesFolderPath.trim()) {
       try {
@@ -20,7 +21,7 @@ export async function POST(req: Request) {
         fileMetadata = metadata
         if (notes.length > 0) {
           notesContent = '\n\n## Notes from your folder:\n\n' + notes.join('\n\n---\n\n')
-          
+
           // Add file awareness section
           const filesList = metadata
             .sort((a, b) => b.mtime.getTime() - a.mtime.getTime()) // Sort by most recent first
@@ -30,7 +31,7 @@ export async function POST(req: Request) {
               return `${index + 1}. "${file.name}" (path: ${file.path}, modified: ${dateStr}${isToday ? ' - TODAY' : ''})`
             })
             .join('\n')
-          
+
           notesContent += `\n\n## Available Files (sorted by most recent first):\n${filesList}\n\nIMPORTANT: When the user asks to add something to their TODO list for today, you should:
 1. Find the most relevant note - typically the most recent file (file #1), or a file that was modified today (marked with "TODAY")
 2. Use the writeToFile tool to append a TODO item to that file
@@ -38,7 +39,7 @@ export async function POST(req: Request) {
    - [ ] Exercise and go to the gym
    or
    - TODO: Exercise and go to the gym
-   
+
 Always use the writeToFile tool with mode='append' when adding TODO items. The filePath should be the full path from the Available Files list above.`
         }
       } catch (error) {
@@ -47,7 +48,30 @@ Always use the writeToFile tool with mode='append' when adding TODO items. The f
       }
     }
 
-    const systemPrompt = 'You are OpenCoach, an AI coaching assistant. Help the user with their goals and priorities. When creating calendar events, always provide both the Google Calendar link and the .ics file download link so users can add the event to their preferred calendar app. CRITICAL: When using the createGoogleCalendarLink tool, the tool returns a "markdownResponse" field with pre-formatted markdown links. You MUST copy and paste the "markdownResponse" value exactly as-is into your response. Do NOT create your own links, modify the URLs, or use localhost URLs. Simply use the markdownResponse field directly.' + notesContent
+    // If calendar URL is provided, fetch and include calendar information
+    let calendarContent = ''
+    if (calendarUrl && typeof calendarUrl === 'string' && calendarUrl.trim()) {
+      try {
+        const httpUrl = calendarUrl.trim().replace(/^webcal:\/\//, 'https://')
+        console.log('[Chat API] Fetching calendar from URL:', httpUrl)
+
+        const calendarInfo = await parseICalFromUrl(httpUrl)
+        const summary = formatCalendarSummary(calendarInfo, 10)
+
+        calendarContent = '\n\n## Your Calendar:\n\n' + summary
+        calendarContent += '\n\nIMPORTANT: This calendar information is available as context. You can reference events when helping the user plan their time, avoid scheduling conflicts, or answer questions about their schedule. The calendar will be automatically refreshed when needed using the getCalendarInfo tool.'
+
+        console.log('[Chat API] Successfully loaded calendar with', calendarInfo.totalEvents, 'events')
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error)
+        console.error('[Chat API] Error reading calendar:', errorMessage)
+
+        calendarContent = `\n\n## Calendar:\n\nNote: Unable to fetch calendar information. Error: ${errorMessage}\n\nCommon issues:\n1. The calendar URL may need to be a public/shared calendar\n2. Some calendar providers require the calendar to be publicly accessible\n3. For Google Calendar, make sure to use the "Secret address in iCal format" from calendar settings\n4. The URL should end with .ics\n\nYou can still use the getCalendarInfo tool if the user provides a different calendar URL.`
+        // Continue without calendar if it can't be read
+      }
+    }
+
+    const systemPrompt = 'You are OpenCoach, an AI coaching assistant. Help the user with their goals and priorities. You have access to the user\'s calendar and can fetch information about their schedule using the getCalendarInfo tool when needed. When creating calendar events, always provide both the Google Calendar link and the .ics file download link so users can add the event to their preferred calendar app. CRITICAL: When using the createGoogleCalendarLink tool, the tool returns a "markdownResponse" field with pre-formatted markdown links. You MUST copy and paste the "markdownResponse" value exactly as-is into your response. Do NOT create your own links, modify the URLs, or use localhost URLs. Simply use the markdownResponse field directly.' + notesContent + calendarContent
 
     const result = await streamText({
       model: openai('gpt-3.5-turbo'),
@@ -55,6 +79,53 @@ Always use the writeToFile tool with mode='append' when adding TODO items. The f
       system: systemPrompt,
       maxSteps: 5, // Allow multiple tool calls and responses
       tools: {
+        getCalendarInfo: tool({
+          description: 'Fetch and parse calendar information from an iCal calendar URL. Use this to get information about upcoming events, meetings, and schedule. The calendar URL should be an iCal/webcal subscription link (e.g., from Google Calendar, Apple Calendar, Outlook). This provides context about the user\'s schedule to help with planning, scheduling conflicts, and time management.',
+          parameters: z.object({
+            calendarUrl: z.string().describe('The iCal calendar subscription URL (webcal:// or https:// URL to .ics file)'),
+            maxEvents: z.number().optional().default(10).describe('Maximum number of events to include in each section (default: 10)')
+          }),
+          execute: async ({ calendarUrl, maxEvents }) => {
+            try {
+              // Convert webcal:// to https://
+              const httpUrl = calendarUrl.replace(/^webcal:\/\//, 'https://')
+
+              const calendarInfo = await parseICalFromUrl(httpUrl)
+              const summary = formatCalendarSummary(calendarInfo, maxEvents)
+
+              return {
+                success: true,
+                summary,
+                stats: {
+                  totalEvents: calendarInfo.totalEvents,
+                  todayCount: calendarInfo.todayEvents.length,
+                  thisWeekCount: calendarInfo.thisWeekEvents.length,
+                  upcomingCount: calendarInfo.upcomingEvents.length,
+                },
+                // Return structured data for further processing
+                todayEvents: calendarInfo.todayEvents.slice(0, maxEvents).map(e => ({
+                  summary: e.summary,
+                  start: e.start.toISOString(),
+                  end: e.end.toISOString(),
+                  location: e.location,
+                  description: e.description,
+                })),
+                thisWeekEvents: calendarInfo.thisWeekEvents.slice(0, maxEvents).map(e => ({
+                  summary: e.summary,
+                  start: e.start.toISOString(),
+                  end: e.end.toISOString(),
+                  location: e.location,
+                  description: e.description,
+                })),
+              }
+            } catch (error) {
+              return {
+                success: false,
+                error: `Failed to fetch calendar: ${error instanceof Error ? error.message : String(error)}`,
+              }
+            }
+          },
+        }),
         writeToFile: tool({
           description: 'Write or append content to a note file. Use this when the user asks to add something to their notes, TODO list, or any file. IMPORTANT: After using this tool, you MUST confirm to the user what was done and which file was modified.',
           parameters: z.object({

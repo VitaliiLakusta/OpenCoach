@@ -13,6 +13,7 @@ export default function Home() {
     api: '/api/chat',
     body: {
       notesFolderPath,
+      calendarUrl: icalCalendarAddress,
     },
   })
 
@@ -51,10 +52,14 @@ export default function Home() {
     loadState()
   }, [])
 
-  // Save iCal calendar address to state when it changes
+  // Save iCal calendar address to local storage and server when it changes
   useEffect(() => {
     if (!icalCalendarAddress) return
 
+    // Save to local storage immediately
+    localStorage.setItem('icalCalendarAddress', icalCalendarAddress)
+
+    // Save to server with debounce
     const saveCalendarAddress = async () => {
       try {
         await fetch('/api/state', {
@@ -71,10 +76,14 @@ export default function Home() {
     return () => clearTimeout(timeoutId)
   }, [icalCalendarAddress])
 
-  // Save notes folder path to state when it changes
+  // Save notes folder path to local storage and server when it changes
   useEffect(() => {
     if (!notesFolderPath) return
 
+    // Save to local storage immediately
+    localStorage.setItem('notesFolderPath', notesFolderPath)
+
+    // Save to server with debounce
     const saveFolderPath = async () => {
       try {
         await fetch('/api/state', {
