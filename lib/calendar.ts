@@ -38,6 +38,12 @@ export async function parseICalFromUrl(url: string): Promise<CalendarInfo> {
     })
 
     if (!response.ok) {
+      // Provide specific guidance based on status code
+      if (response.status === 401 || response.status === 403) {
+        throw new Error(`Access denied (HTTP ${response.status}). This is likely a private calendar URL that requires authentication. Please make your calendar public or use a public/shared calendar URL. For Google Calendar: Settings → Select your calendar → Access permissions → Make available publicly.`)
+      } else if (response.status === 404) {
+        throw new Error(`Calendar not found (HTTP ${response.status}). Please verify the URL is correct.`)
+      }
       throw new Error(`HTTP ${response.status}: ${response.statusText}`)
     }
 
