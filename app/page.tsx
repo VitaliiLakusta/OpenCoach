@@ -7,15 +7,27 @@ import remarkGfm from 'remark-gfm'
 import Image from 'next/image'
 import { AVAILABLE_MODELS, DEFAULT_MODEL, type ModelConfig } from '@/lib/models'
 
+interface Space {
+  name: string
+  path: string
+}
+
 export default function Home() {
   const [notesFolderPath, setNotesFolderPath] = useState('')
+  const [selectedSpace, setSelectedSpace] = useState<Space | null>(null)
+  const [spaces, setSpaces] = useState<Space[]>([])
+  const [loadingSpaces, setLoadingSpaces] = useState(false)
   const [icalCalendarAddress, setIcalCalendarAddress] = useState('')
   const [selectedModel, setSelectedModel] = useState<string>(DEFAULT_MODEL)
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission | 'checking' | 'unsupported'>('checking')
+
+  // Compute the actual folder path to use for reading notes
+  const actualNotesFolderPath = selectedSpace ? selectedSpace.path : notesFolderPath
+
   const { messages, input, handleInputChange, handleSubmit, isLoading } = useChat({
     api: '/api/chat',
     body: {
-      notesFolderPath,
+      notesFolderPath: actualNotesFolderPath,
       calendarUrl: icalCalendarAddress,
       model: selectedModel,
     },
@@ -26,6 +38,7 @@ export default function Home() {
     const localIcalAddress = localStorage.getItem('icalCalendarAddress')
     const localNotesFolderPath = localStorage.getItem('notesFolderPath')
     const localSelectedModel = localStorage.getItem('selectedModel')
+    const localSelectedSpace = localStorage.getItem('selectedSpace')
 
     if (localIcalAddress) {
       setIcalCalendarAddress(localIcalAddress)
@@ -36,7 +49,59 @@ export default function Home() {
     if (localSelectedModel) {
       setSelectedModel(localSelectedModel)
     }
+    if (localSelectedSpace) {
+      try {
+        setSelectedSpace(JSON.parse(localSelectedSpace))
+      } catch (error) {
+        console.error('Error parsing selected space from localStorage:', error)
+      }
+    }
   }, [])
+
+  // Load spaces when notes folder path changes
+  useEffect(() => {
+    if (!notesFolderPath || !notesFolderPath.trim()) {
+      setSpaces([])
+      return
+    }
+
+    const loadSpaces = async () => {
+      setLoadingSpaces(true)
+      try {
+        const response = await fetch('/api/spaces', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ notesFolderPath }),
+        })
+
+        const data = await response.json()
+        if (data.ok) {
+          setSpaces(data.spaces || [])
+        } else {
+          console.error('Error loading spaces:', data.error)
+          setSpaces([])
+        }
+      } catch (error) {
+        console.error('Error fetching spaces:', error)
+        setSpaces([])
+      } finally {
+        setLoadingSpaces(false)
+      }
+    }
+
+    loadSpaces()
+  }, [notesFolderPath])
+
+  // Save selected space to local storage when it changes
+  useEffect(() => {
+    if (!selectedSpace) {
+      localStorage.removeItem('selectedSpace')
+      return
+    }
+    localStorage.setItem('selectedSpace', JSON.stringify(selectedSpace))
+  }, [selectedSpace])
 
   // Save iCal calendar address to local storage when it changes
   useEffect(() => {
@@ -85,11 +150,11 @@ export default function Home() {
 
   // Start reminders polling once a notes folder path is set
   useEffect(() => {
-    if (!notesFolderPath || !notesFolderPath.trim()) {
+    if (!actualNotesFolderPath || !actualNotesFolderPath.trim()) {
       return
     }
 
-    const folder = notesFolderPath.trim()
+    const folder = actualNotesFolderPath.trim()
     console.log('[RemindersClient] Starting polling for CONTEXT.md in folder:', folder)
 
     const runOnce = async () => {
@@ -118,7 +183,7 @@ export default function Home() {
       console.log('[RemindersClient] Stopping polling for folder:', folder)
       clearInterval(intervalId)
     }
-  }, [notesFolderPath])
+  }, [actualNotesFolderPath])
 
   // Check for due reminders every 10 seconds and fire notifications
   useEffect(() => {
@@ -246,9 +311,60 @@ export default function Home() {
   }, [notificationPermission])
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-b from-slate-50 to-white">
-      {/* Header */}
-      <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-md border-b border-slate-200 shadow-sm">
+    <div className="min-h-screen flex bg-gradient-to-b from-slate-50 to-white">
+      {/* Sidebar for Spaces */}
+      {spaces.length > 0 && (
+        <aside className="w-64 border-r border-slate-200 bg-white flex flex-col">
+          <div className="p-4 border-b border-slate-200">
+            <h2 className="text-sm font-semibold text-slate-800">Spaces</h2>
+            <p className="text-xs text-slate-500 mt-1">Select a space to work in</p>
+          </div>
+          <div className="flex-1 overflow-y-auto p-2">
+            {/* "All Notes" option to use base folder */}
+            <button
+              onClick={() => setSelectedSpace(null)}
+              className={`w-full text-left px-3 py-2 rounded-lg mb-1 transition-colors duration-150 ${
+                !selectedSpace
+                  ? 'bg-blue-100 text-blue-800 font-medium'
+                  : 'text-slate-700 hover:bg-slate-100'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-lg">📁</span>
+                <span className="text-sm">All Notes</span>
+              </div>
+            </button>
+
+            {loadingSpaces ? (
+              <div className="flex items-center justify-center py-4">
+                <div className="text-sm text-slate-500">Loading...</div>
+              </div>
+            ) : (
+              spaces.map((space) => (
+                <button
+                  key={space.path}
+                  onClick={() => setSelectedSpace(space)}
+                  className={`w-full text-left px-3 py-2 rounded-lg mb-1 transition-colors duration-150 ${
+                    selectedSpace?.path === space.path
+                      ? 'bg-blue-100 text-blue-800 font-medium'
+                      : 'text-slate-700 hover:bg-slate-100'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">📂</span>
+                    <span className="text-sm truncate">{space.name}</span>
+                  </div>
+                </button>
+              ))
+            )}
+          </div>
+        </aside>
+      )}
+
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col">
+        {/* Header */}
+        <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-md border-b border-slate-200 shadow-sm">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -377,7 +493,7 @@ export default function Home() {
             {/* Notes Folder Path */}
             <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
               <label className="block text-sm font-semibold text-slate-800 mb-3">
-                Notes Folder Path
+                Notes Folder Root
               </label>
               <input
                 type="text"
@@ -651,6 +767,7 @@ export default function Home() {
             </p>
           </form>
         </div>
+      </div>
       </div>
     </div>
   )
