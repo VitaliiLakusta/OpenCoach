@@ -33,6 +33,7 @@ export async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => ({}))
     const notesFolderPath = typeof body?.notesFolderPath === 'string' ? body.notesFolderPath.trim() : ''
+    const openaiApiKey = typeof body?.openaiApiKey === 'string' ? body.openaiApiKey.trim() : ''
 
     if (!notesFolderPath) {
       log('Missing notesFolderPath in request body. Skipping.')
@@ -88,7 +89,7 @@ export async function POST(req: Request) {
     const contextContent = await readFile(contextPath, 'utf-8')
     log('CONTEXT.md changed, calling OpenAI to extract reminders...')
 
-    const remindersPayload = await callOpenAIForReminders(contextContent)
+    const remindersPayload = await callOpenAIForReminders(contextContent, openaiApiKey)
 
     if (!remindersPayload) {
       log('OpenAI did not return a valid reminders payload. Skipping state update.')
@@ -161,10 +162,11 @@ export async function POST(req: Request) {
   }
 }
 
-async function callOpenAIForReminders(contextText: string): Promise<RemindersPayload | null> {
-  const apiKey = process.env.OPENAI_API_KEY
-  if (!apiKey) {
-    log('OPENAI_API_KEY is not set. Cannot call OpenAI.')
+async function callOpenAIForReminders(contextText: string, apiKey: string): Promise<RemindersPayload | null> {
+  // Use provided API key, fallback to environment variable
+  const effectiveApiKey = apiKey || process.env.OPENAI_API_KEY
+  if (!effectiveApiKey) {
+    log('OPENAI_API_KEY is not provided in request or environment. Cannot call OpenAI.')
     return null
   }
 
@@ -215,7 +217,7 @@ Extract reminders according to the required JSON schema. Use the current time pr
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
+        Authorization: `Bearer ${effectiveApiKey}`,
       },
       body: JSON.stringify({
         model: 'gpt-4o-mini',

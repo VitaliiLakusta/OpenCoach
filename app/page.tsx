@@ -1,7 +1,7 @@
 'use client'
 
 import { useChat } from 'ai/react'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import Image from 'next/image'
@@ -19,17 +19,79 @@ export default function Home() {
   const [loadingSpaces, setLoadingSpaces] = useState(false)
   const [icalCalendarAddress, setIcalCalendarAddress] = useState('')
   const [selectedModel, setSelectedModel] = useState<string>(DEFAULT_MODEL)
+  const [apiKeys, setApiKeys] = useState<Record<string, string>>({
+    openai: '',
+    anthropic: '',
+    google: '',
+    mistral: '',
+  })
+  const [showApiKey, setShowApiKey] = useState(false)
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission | 'checking' | 'unsupported'>('checking')
 
   // Compute the actual folder path to use for reading notes
   const actualNotesFolderPath = selectedSpace ? selectedSpace.path : notesFolderPath
 
-  const { messages, input, handleInputChange, handleSubmit, isLoading } = useChat({
+  // Get the selected model configuration to determine provider
+  const selectedModelConfig = AVAILABLE_MODELS.find(m => m.id === selectedModel) || AVAILABLE_MODELS.find(m => m.id === DEFAULT_MODEL)
+
+  // Determine the API key label and description based on the selected model's provider
+  const getApiKeyInfo = () => {
+    const provider = selectedModelConfig?.provider
+    switch (provider) {
+      case 'openai':
+        return {
+          label: 'OpenAI API Key',
+          placeholder: 'sk-...',
+          description: 'Enter your OpenAI API key for chat and reminder extraction. Your key is stored locally in your browser.'
+        }
+      case 'anthropic':
+        return {
+          label: 'Anthropic API Key',
+          placeholder: 'sk-ant-...',
+          description: 'Enter your Anthropic API key for Claude models. Your key is stored locally in your browser.'
+        }
+      case 'google':
+        return {
+          label: 'Google API Key',
+          placeholder: 'AIza...',
+          description: 'Enter your Google AI API key for Gemini models. Your key is stored locally in your browser.'
+        }
+      case 'mistral':
+        return {
+          label: 'Mistral API Key',
+          placeholder: 'your-mistral-key...',
+          description: 'Enter your Mistral API key. Your key is stored locally in your browser.'
+        }
+      case 'ollama':
+        return {
+          label: 'API Key (Not Required)',
+          placeholder: 'Not needed for local models',
+          description: 'Local Ollama models run on your machine and do not require an API key.'
+        }
+      default:
+        return {
+          label: 'API Key',
+          placeholder: 'your-api-key...',
+          description: 'Enter your API key for the selected model. Your key is stored locally in your browser.'
+        }
+    }
+  }
+
+  const apiKeyInfo = getApiKeyInfo()
+
+  // Get the current API key for the selected model's provider
+  const currentApiKey = selectedModelConfig?.provider ? apiKeys[selectedModelConfig.provider] || '' : ''
+
+  const { messages, input, handleInputChange, handleSubmit, isLoading, error } = useChat({
     api: '/api/chat',
     body: {
       notesFolderPath: actualNotesFolderPath,
       calendarUrl: icalCalendarAddress,
       model: selectedModel,
+      openaiApiKey: currentApiKey,
+    },
+    onError: (error) => {
+      console.error('Chat error:', error)
     },
   })
 
@@ -39,6 +101,7 @@ export default function Home() {
     const localNotesFolderPath = localStorage.getItem('notesFolderPath')
     const localSelectedModel = localStorage.getItem('selectedModel')
     const localSelectedSpace = localStorage.getItem('selectedSpace')
+    const localApiKeys = localStorage.getItem('apiKeys')
 
     if (localIcalAddress) {
       setIcalCalendarAddress(localIcalAddress)
@@ -54,6 +117,13 @@ export default function Home() {
         setSelectedSpace(JSON.parse(localSelectedSpace))
       } catch (error) {
         console.error('Error parsing selected space from localStorage:', error)
+      }
+    }
+    if (localApiKeys) {
+      try {
+        setApiKeys(JSON.parse(localApiKeys))
+      } catch (error) {
+        console.error('Error parsing API keys from localStorage:', error)
       }
     }
   }, [])
@@ -121,6 +191,17 @@ export default function Home() {
     localStorage.setItem('selectedModel', selectedModel)
   }, [selectedModel])
 
+  // Save API keys to local storage when they change
+  // Use a ref to track if this is the initial mount to prevent overwriting loaded values
+  const isInitialMount = useRef(true)
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false
+      return
+    }
+    localStorage.setItem('apiKeys', JSON.stringify(apiKeys))
+  }, [apiKeys])
+
   // Check notification permission on mount
   useEffect(() => {
     // Check if notifications are supported
@@ -164,7 +245,10 @@ export default function Home() {
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ notesFolderPath: folder }),
+          body: JSON.stringify({
+            notesFolderPath: folder,
+            openaiApiKey: apiKeys.openai,
+          }),
         })
         const json = await res.json().catch(() => null)
         console.log('[RemindersClient] Reminders tick result:', json)
@@ -183,7 +267,7 @@ export default function Home() {
       console.log('[RemindersClient] Stopping polling for folder:', folder)
       clearInterval(intervalId)
     }
-  }, [actualNotesFolderPath])
+  }, [actualNotesFolderPath, apiKeys.openai])
 
   // Check for due reminders every 10 seconds and fire notifications
   useEffect(() => {
@@ -282,7 +366,10 @@ export default function Home() {
                 headers: {
                   'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ notesFolderPath: notesFolderPathFromState }),
+                body: JSON.stringify({
+                  notesFolderPath: notesFolderPathFromState,
+                  openaiApiKey: apiKeys.openai,
+                }),
               })
               const recalcJson = await recalcRes.json().catch(() => null)
               console.log('[RemindersCheck] Re-calculation result:', recalcJson)
@@ -308,7 +395,7 @@ export default function Home() {
       console.log('[RemindersCheck] Stopping reminder check polling')
       clearInterval(intervalId)
     }
-  }, [notificationPermission])
+  }, [notificationPermission, apiKeys.openai])
 
   return (
     <div className="min-h-screen flex bg-gradient-to-b from-slate-50 to-white">
@@ -380,101 +467,6 @@ export default function Home() {
           </summary>
           
           <div className="mt-3 space-y-3">
-            {/* Notification Settings */}
-            <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-              <h3 className="text-sm font-semibold text-slate-800 mb-3">Notifications</h3>
-              <div className="flex items-center gap-3 mb-3">
-                <span className="text-2xl">
-                  {notificationPermission === 'granted' ? '✅' 
-                    : notificationPermission === 'denied' ? '❌' 
-                    : notificationPermission === 'checking' ? '⏳' 
-                    : notificationPermission === 'unsupported' ? '❌'
-                    : '⏳'}
-                </span>
-                <div className="flex-1">
-                  <p className="text-sm text-slate-600">
-                    Status: <span className="font-medium text-slate-800">
-                      {notificationPermission === 'granted' ? 'Granted' 
-                        : notificationPermission === 'denied' ? 'Denied' 
-                        : notificationPermission === 'default' ? 'Pending'
-                        : notificationPermission === 'checking' ? 'Checking...'
-                        : 'Not Supported'}
-                    </span>
-                  </p>
-                </div>
-              </div>
-              
-              <div className="flex gap-2">
-                {notificationPermission !== 'granted' && notificationPermission !== 'unsupported' && notificationPermission !== 'checking' && (
-                  <button
-                    onClick={async () => {
-                      if (typeof window !== 'undefined' && 'Notification' in window) {
-                        const permission = await Notification.requestPermission()
-                        setNotificationPermission(permission)
-                        if (permission === 'granted') {
-                          new Notification('OpenCoach', { body: 'Test notification!' })
-                        }
-                      }
-                    }}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors duration-200 shadow-sm"
-                  >
-                    Enable Notifications
-                  </button>
-                )}
-                {notificationPermission === 'granted' && (
-                  <button
-                    onClick={() => {
-                      console.log('=== MANUAL TEST BUTTON CLICKED ===')
-                      if (typeof window !== 'undefined' && 'Notification' in window) {
-                        console.log('Creating manual test notification...')
-                        try {
-                          const notification = new Notification('OpenCoach Manual Test', { 
-                            body: `Manual test at ${new Date().toLocaleTimeString()}!`,
-                            requireInteraction: true,
-                            silent: false,
-                          })
-                          console.log('Manual notification object created:', notification)
-                          
-                          notification.onclick = () => {
-                            console.log('✅ Manual test notification clicked!')
-                            window.focus()
-                            notification.close()
-                          }
-                          notification.onshow = () => {
-                            console.log('✅✅✅ Manual test notification SHOWN!')
-                          }
-                          notification.onerror = (error) => {
-                            console.error('❌ Manual test notification error:', error)
-                          }
-                          notification.onclose = () => {
-                            console.log('Manual test notification closed')
-                          }
-                        } catch (error) {
-                          console.error('❌ Exception in manual test:', error)
-                        }
-                      } else {
-                        console.error('Notifications not supported in this context')
-                      }
-                    }}
-                    className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors duration-200 shadow-sm"
-                  >
-                    Test Notification
-                  </button>
-                )}
-              </div>
-              
-              {notificationPermission === 'granted' && (
-                <p className="text-xs text-slate-500 mt-3">
-                  Check browser console for detailed logs. If you see "Notification SHOWN" but no popup, check your OS/browser notification settings.
-                </p>
-              )}
-              {notificationPermission === 'unsupported' && (
-                <p className="text-xs text-slate-500 mt-3">
-                  Your browser does not support notifications. Try using Chrome, Firefox, or Safari.
-                </p>
-              )}
-            </div>
-            
             {/* Notes Folder Path */}
             <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
               <label className="block text-sm font-semibold text-slate-800 mb-3">
@@ -505,7 +497,7 @@ export default function Home() {
                 className="w-full px-4 py-2.5 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all duration-200"
               />
               <p className="text-xs text-slate-500 mt-2">
-                Enter your iCal/ICS calendar feed URL for calendar integration
+                Enter your iCal/ICS calendar. You can find it under Google Calendar settings page as a private iCal URL
               </p>
             </div>
 
@@ -528,6 +520,147 @@ export default function Home() {
               <p className="text-xs text-slate-500 mt-2">
                 Select the AI model to use for conversations. Make sure you have the appropriate API keys configured.
               </p>
+            </div>
+
+            {/* API Key - Dynamic based on selected model */}
+            <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
+              <label className="block text-sm font-semibold text-slate-800 mb-3">
+                {apiKeyInfo.label}
+              </label>
+              <div className="relative">
+                <input
+                  type={showApiKey ? "text" : "password"}
+                  value={currentApiKey}
+                  onChange={(e) => {
+                    const provider = selectedModelConfig?.provider
+                    if (provider && provider !== 'ollama') {
+                      setApiKeys(prev => ({ ...prev, [provider]: e.target.value }))
+                    }
+                  }}
+                  placeholder={apiKeyInfo.placeholder}
+                  disabled={selectedModelConfig?.provider === 'ollama'}
+                  className={`w-full px-4 py-2.5 pr-12 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all duration-200 ${
+                    selectedModelConfig?.provider === 'ollama' ? 'bg-slate-100 cursor-not-allowed' : ''
+                  }`}
+                />
+                {selectedModelConfig?.provider !== 'ollama' && (
+                  <button
+                    type="button"
+                    onClick={() => setShowApiKey(!showApiKey)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                    aria-label={showApiKey ? "Hide API key" : "Show API key"}
+                  >
+                    {showApiKey ? (
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                      </svg>
+                    ) : (
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                      </svg>
+                    )}
+                  </button>
+                )}
+              </div>
+              <p className="text-xs text-slate-500 mt-2">
+                {apiKeyInfo.description}
+              </p>
+            </div>
+
+            {/* Notification Settings */}
+            <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
+              <h3 className="text-sm font-semibold text-slate-800 mb-3">Notifications</h3>
+              <div className="flex items-center gap-3 mb-3">
+                <span className="text-2xl">
+                  {notificationPermission === 'granted' ? '✅'
+                    : notificationPermission === 'denied' ? '❌'
+                    : notificationPermission === 'checking' ? '⏳'
+                    : notificationPermission === 'unsupported' ? '❌'
+                    : '⏳'}
+                </span>
+                <div className="flex-1">
+                  <p className="text-sm text-slate-600">
+                    Status: <span className="font-medium text-slate-800">
+                      {notificationPermission === 'granted' ? 'Granted'
+                        : notificationPermission === 'denied' ? 'Denied'
+                        : notificationPermission === 'default' ? 'Pending'
+                        : notificationPermission === 'checking' ? 'Checking...'
+                        : 'Not Supported'}
+                    </span>
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                {notificationPermission !== 'granted' && notificationPermission !== 'unsupported' && notificationPermission !== 'checking' && (
+                  <button
+                    onClick={async () => {
+                      if (typeof window !== 'undefined' && 'Notification' in window) {
+                        const permission = await Notification.requestPermission()
+                        setNotificationPermission(permission)
+                        if (permission === 'granted') {
+                          new Notification('OpenCoach', { body: 'Test notification!' })
+                        }
+                      }
+                    }}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors duration-200 shadow-sm"
+                  >
+                    Enable Notifications
+                  </button>
+                )}
+                {notificationPermission === 'granted' && (
+                  <button
+                    onClick={() => {
+                      console.log('=== MANUAL TEST BUTTON CLICKED ===')
+                      if (typeof window !== 'undefined' && 'Notification' in window) {
+                        console.log('Creating manual test notification...')
+                        try {
+                          const notification = new Notification('OpenCoach Manual Test', {
+                            body: `Manual test at ${new Date().toLocaleTimeString()}!`,
+                            requireInteraction: true,
+                            silent: false,
+                          })
+                          console.log('Manual notification object created:', notification)
+
+                          notification.onclick = () => {
+                            console.log('✅ Manual test notification clicked!')
+                            window.focus()
+                            notification.close()
+                          }
+                          notification.onshow = () => {
+                            console.log('✅✅✅ Manual test notification SHOWN!')
+                          }
+                          notification.onerror = (error) => {
+                            console.error('❌ Manual test notification error:', error)
+                          }
+                          notification.onclose = () => {
+                            console.log('Manual test notification closed')
+                          }
+                        } catch (error) {
+                          console.error('❌ Exception in manual test:', error)
+                        }
+                      } else {
+                        console.error('Notifications not supported in this context')
+                      }
+                    }}
+                    className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors duration-200 shadow-sm"
+                  >
+                    Test Notification
+                  </button>
+                )}
+              </div>
+
+              {notificationPermission === 'granted' && (
+                <p className="text-xs text-slate-500 mt-3">
+                  Check browser console for detailed logs. If you see "Notification SHOWN" but no popup, check your OS/browser notification settings.
+                </p>
+              )}
+              {notificationPermission === 'unsupported' && (
+                <p className="text-xs text-slate-500 mt-3">
+                  Your browser does not support notifications. Try using Chrome, Firefox, or Safari.
+                </p>
+              )}
             </div>
           </div>
         </details>
@@ -706,6 +839,25 @@ export default function Home() {
                     <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
                   </div>
                   <span className="text-sm text-slate-500">Thinking...</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {error && (
+            <div className="flex gap-4 justify-start">
+              <div className="rounded-lg shadow-md flex items-center justify-center bg-white flex-shrink-0 p-0.5">
+                <Image src="/logo.png" alt="OpenCoach" width={32} height={32} className="object-contain" />
+              </div>
+              <div className="bg-red-50 border border-red-200 px-5 py-3.5 rounded-2xl shadow-sm max-w-3xl">
+                <div className="flex items-start gap-2">
+                  <svg className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  <div className="flex-1">
+                    <p className="text-sm text-red-800 font-medium">Error</p>
+                    <p className="text-sm text-red-700 mt-1">{error.message}</p>
+                  </div>
                 </div>
               </div>
             </div>

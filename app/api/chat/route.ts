@@ -50,15 +50,23 @@ function getOllamaClient() {
 }
 
 // Helper function to get the model instance based on model config
-async function getModel(modelId: string) {
+async function getModel(modelId: string, openaiApiKey?: string) {
   const modelConfig = getModelById(modelId) || getModelById(DEFAULT_MODEL)
   if (!modelConfig) {
     throw new Error(`Model ${modelId} not found`)
   }
 
   switch (modelConfig.provider) {
-    case 'openai':
+    case 'openai': {
+      // If a custom API key is provided, create a custom OpenAI instance
+      if (openaiApiKey) {
+        const customOpenAI = createOpenAI({
+          apiKey: openaiApiKey,
+        })
+        return customOpenAI(modelConfig.modelId)
+      }
       return openai(modelConfig.modelId)
+    }
     case 'ollama': {
       // Use Ollama client with OpenAI-compatible API
       console.log(`[getModel] Creating Ollama model instance for: ${modelConfig.modelId}`)
@@ -74,6 +82,9 @@ async function getModel(modelId: string) {
       }
     }
     case 'anthropic': {
+      // If a custom API key is provided for Anthropic, create a custom instance
+      // Note: This would require importing createAnthropic from @ai-sdk/anthropic
+      // For now, we use the default provider which reads from ANTHROPIC_API_KEY env var
       if (!providerCache.anthropic) {
         providerCache.anthropic = await loadProvider('anthropic')
       }
@@ -83,6 +94,9 @@ async function getModel(modelId: string) {
       return providerCache.anthropic(modelConfig.modelId)
     }
     case 'google': {
+      // If a custom API key is provided for Google, create a custom instance
+      // Note: This would require importing createGoogle from @ai-sdk/google
+      // For now, we use the default provider which reads from GOOGLE_API_KEY env var
       if (!providerCache.google) {
         providerCache.google = await loadProvider('google')
       }
@@ -92,6 +106,9 @@ async function getModel(modelId: string) {
       return providerCache.google(modelConfig.modelId)
     }
     case 'mistral': {
+      // If a custom API key is provided for Mistral, create a custom instance
+      // Note: This would require importing createMistral from @ai-sdk/mistral
+      // For now, we use the default provider which reads from MISTRAL_API_KEY env var
       if (!providerCache.mistral) {
         providerCache.mistral = await loadProvider('mistral')
       }
@@ -109,17 +126,66 @@ async function getModel(modelId: string) {
 // This will be replaced with Mastra agent integration later
 export async function POST(req: Request) {
   try {
-    const { messages, notesFolderPath, calendarUrl, model: selectedModelId } = await req.json()
-    
-    // Get the model instance based on selection (defaults to DEFAULT_MODEL if not provided)
+    const { messages, notesFolderPath, calendarUrl, model: selectedModelId, openaiApiKey } = await req.json()
+
+    // Validate API key for non-Ollama models
     const modelId = selectedModelId || DEFAULT_MODEL
+    const modelConfig = getModelById(modelId) || getModelById(DEFAULT_MODEL)
+
+    if (modelConfig?.provider !== 'ollama' && !openaiApiKey && !process.env.OPENAI_API_KEY) {
+      const providerName = modelConfig?.provider === 'openai' ? 'OpenAI'
+        : modelConfig?.provider === 'anthropic' ? 'Anthropic'
+        : modelConfig?.provider === 'google' ? 'Google'
+        : modelConfig?.provider === 'mistral' ? 'Mistral'
+        : 'API'
+
+      return new Response(
+        JSON.stringify({
+          error: `${providerName} API key is missing. Please configure your API key in the Configuration section (⚙️) at the top of the page, or use a local Ollama model which doesn't require an API key.`
+        }),
+        {
+          status: 401,
+          headers: { 'Content-Type': 'application/json' }
+        }
+      )
+    }
+
+    // Get the model instance based on selection (defaults to DEFAULT_MODEL if not provided)
     let modelInstance
     try {
-      modelInstance = await getModel(modelId)
+      modelInstance = await getModel(modelId, openaiApiKey)
     } catch (error) {
       console.error(`Error loading model ${modelId}:`, error)
+
+      // Check if it's an API key error
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      if (errorMessage.includes('API key') || errorMessage.includes('Incorrect API key') || errorMessage.includes('401')) {
+        const providerName = modelConfig?.provider === 'openai' ? 'OpenAI'
+          : modelConfig?.provider === 'anthropic' ? 'Anthropic'
+          : modelConfig?.provider === 'google' ? 'Google'
+          : modelConfig?.provider === 'mistral' ? 'Mistral'
+          : 'API'
+
+        return new Response(
+          JSON.stringify({
+            error: `Invalid ${providerName} API key. Please check your API key in the Configuration section (⚙️) at the top of the page and make sure it's correct.`
+          }),
+          {
+            status: 401,
+            headers: { 'Content-Type': 'application/json' }
+          }
+        )
+      }
+
       // Fallback to default OpenAI model
-      modelInstance = openai('gpt-4o-mini')
+      if (openaiApiKey) {
+        const customOpenAI = createOpenAI({
+          apiKey: openaiApiKey,
+        })
+        modelInstance = customOpenAI('gpt-4o-mini')
+      } else {
+        modelInstance = openai('gpt-4o-mini')
+      }
       console.warn(`Falling back to default model: gpt-4o-mini`)
     }
 
@@ -193,9 +259,9 @@ Always use the writeToFile tool with mode='append' when adding TODO items. The f
     }
 
     const systemPrompt = 'You are OpenCoach, an AI coaching assistant. Help the user with their goals and priorities.' + calendarInstruction + ' When creating calendar events, always provide both the Google Calendar link and the .ics file download link so users can add the event to their preferred calendar app. CRITICAL: When using the createGoogleCalendarLink tool, the tool returns a "markdownResponse" field with pre-formatted markdown links. You MUST copy and paste the "markdownResponse" value exactly as-is into your response. Do NOT create your own links, modify the URLs, or use localhost URLs. Simply use the markdownResponse field directly.' + notesContent + calendarContent
-    
+
     // Determine temperature based on model (some models like o1/o3 have restrictions)
-    const modelConfig = getModelById(modelId) || getModelById(DEFAULT_MODEL)
+    // modelConfig was already declared earlier in the function
     const isO1Model = modelConfig?.modelId.startsWith('o1') || modelConfig?.modelId.startsWith('o3')
     const temperature = isO1Model ? 1 : 0.7 // O1/O3 models only support temperature: 1
     

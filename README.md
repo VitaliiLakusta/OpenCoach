@@ -17,13 +17,24 @@ A minimal prototype chat application with Next.js, Vercel AI SDK, and Mastra (to
 npm install
 ```
 
-2. Set up environment variables:
-Create a `.env.local` file with your API keys (optional for local models):
+2. Set up API keys:
+
+You have two options for configuring your OpenAI API key:
+
+**Option A: Via UI (Recommended)**
+- Start the app and click on "⚙️ Configuration"
+- Enter your OpenAI API key in the "OpenAI API Key" field
+- Your key is stored securely in your browser's local storage
+
+**Option B: Via Environment Variables**
+Create a `.env.local` file with your API keys:
 ```
-OPENAI_API_KEY=your_api_key_here
-ANTHROPIC_API_KEY=your_api_key_here  # Optional
-GOOGLE_API_KEY=your_api_key_here     # Optional
+OPENAI_API_KEY=your_api_key_here      # Optional if configured in UI
+ANTHROPIC_API_KEY=your_api_key_here   # Optional
+GOOGLE_API_KEY=your_api_key_here      # Optional
 ```
+
+Note: Keys configured in the UI take precedence over environment variables.
 
 3. (Optional) Set up local models with Ollama:
 
