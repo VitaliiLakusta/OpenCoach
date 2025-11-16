@@ -151,12 +151,52 @@ ollama pull llama3.2     # Download if missing
 
 - ✅ Multi-provider AI model support (OpenAI, Anthropic, Google, Mistral, Ollama)
 - ✅ Local LLM support via Ollama
+- ✅ **Desktop Apps for macOS & Windows** - Native Electron apps available!
 - ✅ Basic chat UI using Vercel AI SDK's `useChat` hook
 - ✅ Streaming responses from the backend
 - ✅ Notes folder integration (read/write)
 - ✅ Calendar integration (iCal format)
 - ✅ TODO management
 - ✅ Event creation with calendar links
+
+## Desktop App (Electron)
+
+OpenCoach is available as a native desktop application for **macOS** and **Windows**!
+
+### Download
+
+Pre-built installers are available in the `dist/` folder after building:
+
+**macOS:**
+- `OpenCoach-0.1.0-universal.dmg` - Drag-and-drop installer (Universal: Intel + Apple Silicon)
+- `OpenCoach-0.1.0-universal-mac.zip` - Portable version
+
+**Windows:**
+- `OpenCoach Setup 0.1.0.exe` - Full installer with Start Menu shortcuts
+- `OpenCoach 0.1.0.exe` - Portable executable
+
+### Building Desktop Apps
+
+```bash
+# Build for macOS (requires macOS)
+npm run electron:build:mac
+
+# Build for Windows (can be built on macOS)
+npm run electron:build:win
+
+# Build for both platforms
+npm run electron:build:all
+```
+
+### Development Mode
+
+Run OpenCoach in Electron during development:
+
+```bash
+npm run electron:dev
+```
+
+📚 **For complete Electron documentation, see [ELECTRON.md](./ELECTRON.md)**
 
 ## Next Steps
 

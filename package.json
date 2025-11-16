@@ -1,12 +1,20 @@
 {
   "name": "opencoach",
   "version": "0.1.0",
+  "description": "Your AI coaching assistant",
+  "author": "OpenCoach",
+  "main": "electron/main.js",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "electron:dev": "concurrently \"npm run dev\" \"wait-on http://localhost:3000 && cross-env NODE_ENV=development electron .\"",
+    "electron:build": "cross-env ELECTRON_BUILD=true next build && electron-builder",
+    "electron:build:mac": "cross-env ELECTRON_BUILD=true next build && electron-builder --mac",
+    "electron:build:win": "cross-env ELECTRON_BUILD=true next build && electron-builder --win",
+    "electron:build:all": "cross-env ELECTRON_BUILD=true next build && electron-builder --mac --win"
   },
   "dependencies": {
     "@ai-sdk/openai": "^0.0.50",
@@ -27,8 +35,90 @@
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
     "autoprefixer": "^10.4.22",
+    "concurrently": "^9.2.1",
+    "cross-env": "^10.1.0",
+    "electron": "^39.2.1",
+    "electron-builder": "^26.0.12",
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.0",
-    "typescript": "^5.0.0"
+    "typescript": "^5.0.0",
+    "wait-on": "^9.0.3"
+  },
+  "build": {
+    "appId": "com.opencoach.app",
+    "productName": "OpenCoach",
+    "copyright": "Copyright © 2025 OpenCoach",
+    "files": [
+      "electron/**/*",
+      ".next/**/*",
+      "public/**/*",
+      "node_modules/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "buildResources": "public",
+      "output": "dist"
+    },
+    "mac": {
+      "category": "public.app-category.productivity",
+      "icon": "build/icon.icns",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["universal"]
+        },
+        {
+          "target": "zip",
+          "arch": ["universal"]
+        }
+      ],
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist"
+    },
+    "dmg": {
+      "contents": [
+        {
+          "x": 130,
+          "y": 220
+        },
+        {
+          "x": 410,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ],
+      "title": "OpenCoach ${version}",
+      "background": null
+    },
+    "win": {
+      "icon": "public/logo.png",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        },
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "deleteAppDataOnUninstall": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "OpenCoach"
+    },
+    "linux": {
+      "icon": "public/logo.png",
+      "category": "Utility",
+      "target": ["AppImage", "deb"]
+    }
   }
 }
