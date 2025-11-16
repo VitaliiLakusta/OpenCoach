@@ -186,7 +186,13 @@ export default function Home() {
   }, [notesFolderPath])
 
   // Save selected model to local storage when it changes
+  // Use a ref to track if this is the initial mount to prevent overwriting loaded values
+  const isInitialMountModel = useRef(true)
   useEffect(() => {
+    if (isInitialMountModel.current) {
+      isInitialMountModel.current = false
+      return
+    }
     if (!selectedModel) return
     localStorage.setItem('selectedModel', selectedModel)
   }, [selectedModel])
