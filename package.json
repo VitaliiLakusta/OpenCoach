@@ -21,12 +21,14 @@
     "@mastra/core": "^0.1.0",
     "@tailwindcss/typography": "^0.5.19",
     "ai": "^3.0.0",
+    "electron-log": "^5.4.3",
     "next": "^14.0.0",
     "node-ical": "^0.22.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
+    "sharp": "^0.34.5",
     "zod": "^3.23.8"
   },
   "devDependencies": {
@@ -47,6 +49,7 @@
     "appId": "com.opencoach.app",
     "productName": "OpenCoach",
     "copyright": "Copyright © 2025 OpenCoach",
+    "asar": false,
     "files": [
       "electron/**/*",
       ".next/**/*",
@@ -64,11 +67,15 @@
       "target": [
         {
           "target": "dmg",
-          "arch": ["universal"]
+          "arch": [
+            "arm64"
+          ]
         },
         {
           "target": "zip",
-          "arch": ["universal"]
+          "arch": [
+            "arm64"
+          ]
         }
       ],
       "hardenedRuntime": true,
@@ -97,11 +104,15 @@
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         },
         {
           "target": "portable",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ]
     },
@@ -117,7 +128,10 @@
     "linux": {
       "icon": "public/logo.png",
       "category": "Utility",
-      "target": ["AppImage", "deb"]
+      "target": [
+        "AppImage",
+        "deb"
+      ]
     }
   }
 }

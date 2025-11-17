@@ -62,14 +62,14 @@ function startNextServer() {
     }
 
     // In production, start the Next.js server
-    const nextPath = path.join(__dirname, '../node_modules/.bin/next')
-    const appPath = path.join(__dirname, '..')
+    const appPath = app.isPackaged ? app.getAppPath() : path.join(__dirname, '..')
+    const nextPath = path.join(appPath, 'node_modules', 'next', 'dist', 'bin', 'next')
 
     console.log('Starting Next.js server...')
     console.log('Next path:', nextPath)
     console.log('App path:', appPath)
 
-    nextServer = spawn('node', [nextPath, 'start', '-p', PORT], {
+    nextServer = spawn('node', [nextPath, 'start', '-p', PORT.toString()], {
       cwd: appPath,
       env: {
         ...process.env,

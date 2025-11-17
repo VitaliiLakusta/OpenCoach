@@ -2,6 +2,21 @@
 
 A minimal prototype chat application with Next.js, Vercel AI SDK, and Mastra (to be integrated).
 
+## Getting Started
+
+You have two options to run OpenCoach:
+
+**Option 1: Run the Pre-built Desktop App** (Recommended for most users)
+- Download the pre-built application from the [dist/](dist/) directory
+- macOS: Use `OpenCoach-0.1.0-universal.dmg` or the `.zip` file
+- Windows: Use `OpenCoach Setup 0.1.0.exe` or the portable `.exe` file
+- No setup required - just download and run!
+
+**Option 2: Run Locally from Source** (For developers)
+- Clone/checkout this project
+- Follow the setup instructions below to run the development server
+- Allows you to modify and customize the application
+
 ## Features
 
 ✨ **Multi-Model Support** - Choose from OpenAI, Anthropic, Google, Mistral, or **local models**  
@@ -187,6 +202,8 @@ npm run electron:build:win
 # Build for both platforms
 npm run electron:build:all
 ```
+
+**Note:** After building, the installers and executables will be available in the `dist/` directory.
 
 ### Development Mode
 
