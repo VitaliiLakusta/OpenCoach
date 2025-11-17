@@ -1,4 +1,6 @@
-# OpenCoach
+# OpenCoach 
+
+Check landing page here - [https://opencoach.lovable.app/](https://opencoach.lovable.app/)
 
 A minimal prototype chat application with Next.js, Vercel AI SDK, and Mastra (to be integrated).
 
