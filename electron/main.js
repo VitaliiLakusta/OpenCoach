@@ -1,6 +1,13 @@
 const { app, BrowserWindow, shell } = require('electron')
 const path = require('path')
 const { spawn } = require('child_process')
+const log = require('electron-log')
+
+// Configure logging
+log.transports.file.level = 'info'
+log.transports.console.level = 'info'
+console.log = log.log
+console.error = log.error
 
 let mainWindow
 let nextServer
@@ -56,7 +63,7 @@ function startNextServer() {
   return new Promise((resolve, reject) => {
     if (isDev) {
       // In development, assume Next.js dev server is already running
-      console.log('Development mode: assuming Next.js dev server is running on port', PORT)
+      log.info('Development mode: assuming Next.js dev server is running on port', PORT)
       setTimeout(resolve, 1000)
       return
     }
@@ -65,31 +72,40 @@ function startNextServer() {
     const appPath = app.isPackaged ? app.getAppPath() : path.join(__dirname, '..')
     const nextPath = path.join(appPath, 'node_modules', 'next', 'dist', 'bin', 'next')
 
-    console.log('Starting Next.js server...')
-    console.log('Next path:', nextPath)
-    console.log('App path:', appPath)
+    log.info('Starting Next.js server...')
+    log.info('Next path:', nextPath)
+    log.info('App path:', appPath)
+    log.info('Exec path:', process.execPath)
 
-    nextServer = spawn('node', [nextPath, 'start', '-p', PORT.toString()], {
+    // Use process.execPath (the Electron binary) to run the script
+    // We must set ELECTRON_RUN_AS_NODE to 1 to make it behave like 'node'
+    nextServer = spawn(process.execPath, [nextPath, 'start', '-p', PORT.toString()], {
       cwd: appPath,
       env: {
         ...process.env,
-        NODE_ENV: 'production'
+        NODE_ENV: 'production',
+        ELECTRON_RUN_AS_NODE: '1'
       }
     })
 
     nextServer.stdout.on('data', (data) => {
-      console.log(`Next.js: ${data}`)
+      log.info(`Next.js: ${data}`)
       if (data.toString().includes('Ready') || data.toString().includes('started')) {
         resolve()
       }
     })
 
     nextServer.stderr.on('data', (data) => {
-      console.error(`Next.js Error: ${data}`)
+      log.error(`Next.js Error: ${data}`)
     })
 
     nextServer.on('close', (code) => {
-      console.log(`Next.js server process exited with code ${code}`)
+      log.info(`Next.js server process exited with code ${code}`)
+    })
+
+    nextServer.on('error', (err) => {
+      log.error('Failed to spawn Next.js server:', err)
+      reject(err)
     })
 
     // Fallback: resolve after 5 seconds even if we don't see "Ready"
@@ -102,7 +118,7 @@ app.on('ready', async () => {
     await startNextServer()
     createWindow()
   } catch (error) {
-    console.error('Failed to start Next.js server:', error)
+    log.error('Failed to start Next.js server:', error)
     app.quit()
   }
 })
@@ -130,5 +146,5 @@ app.on('before-quit', () => {
 
 // Handle any uncaught exceptions
 process.on('uncaughtException', (error) => {
-  console.error('Uncaught exception:', error)
+  log.error('Uncaught exception:', error)
 })
