@@ -19,15 +19,26 @@ function log(...args: any[]) {
   console.log(`[RemindersCheck ${timestamp}]`, ...args)
 }
 
-const STATE_PATH = join(process.cwd(), 'state.json')
-
 export async function GET(req: Request) {
   try {
+    const { searchParams } = new URL(req.url)
+    const notesFolderPath = searchParams.get('notesFolderPath')
+
+    if (!notesFolderPath) {
+      // If no notes folder is provided, we can't check for reminders
+      return new Response(
+        JSON.stringify({ ok: true, dueReminders: [], error: 'No notesFolderPath provided' }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      )
+    }
+
+    const statePath = join(notesFolderPath, 'state.json')
+
     // Load state.json
     let state: StateFile = {}
-    if (fs.existsSync(STATE_PATH)) {
+    if (fs.existsSync(statePath)) {
       try {
-        const raw = await readFile(STATE_PATH, 'utf-8')
+        const raw = await readFile(statePath, 'utf-8')
         state = raw.trim() ? (JSON.parse(raw) as StateFile) : {}
       } catch (err) {
         log('Failed to read/parse state.json:', err)
@@ -75,7 +86,7 @@ export async function GET(req: Request) {
 
     if (dueReminders.length > 0) {
       log(`Found ${dueReminders.length} due reminder(s).`)
-      
+
       // Mark these reminders as completed immediately to prevent duplicate fires
       let markedAny = false
       for (const dueReminder of dueReminders) {
@@ -86,7 +97,7 @@ export async function GET(req: Request) {
           log(`Marked reminder as completed: "${reminder.reminderText}" at ${reminder.dateTime}`)
         }
       }
-      
+
       // Save state if we marked any reminders
       if (markedAny) {
         try {
@@ -94,7 +105,7 @@ export async function GET(req: Request) {
             ...state,
             reminders,
           }
-          await writeFile(STATE_PATH, JSON.stringify(updatedState, null, 2), 'utf-8')
+          await writeFile(statePath, JSON.stringify(updatedState, null, 2), 'utf-8')
           log('Updated state.json with completed reminders')
         } catch (err) {
           log('Failed to save state.json after marking reminders as completed:', err)

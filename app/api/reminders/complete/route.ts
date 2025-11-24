@@ -19,16 +19,23 @@ function log(...args: any[]) {
   console.log(`[RemindersComplete ${timestamp}]`, ...args)
 }
 
-const STATE_PATH = join(process.cwd(), 'state.json')
-
 export async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => ({}))
-    const reminderDateTimes = Array.isArray(body?.reminderDateTimes) 
-      ? body.reminderDateTimes 
+    const notesFolderPath = typeof body?.notesFolderPath === 'string' ? body.notesFolderPath.trim() : ''
+    const reminderDateTimes = Array.isArray(body?.reminderDateTimes)
+      ? body.reminderDateTimes
       : typeof body?.reminderDateTime === 'string'
-      ? [body.reminderDateTime]
-      : []
+        ? [body.reminderDateTime]
+        : []
+
+    if (!notesFolderPath) {
+      log('Missing notesFolderPath in request body.')
+      return new Response(
+        JSON.stringify({ ok: false, error: 'notesFolderPath is required' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } },
+      )
+    }
 
     if (reminderDateTimes.length === 0) {
       log('Missing reminderDateTimes in request body.')
@@ -38,11 +45,13 @@ export async function POST(req: Request) {
       )
     }
 
+    const statePath = join(notesFolderPath, 'state.json')
+
     // Load state.json
     let state: StateFile = {}
-    if (fs.existsSync(STATE_PATH)) {
+    if (fs.existsSync(statePath)) {
       try {
-        const raw = await readFile(STATE_PATH, 'utf-8')
+        const raw = await readFile(statePath, 'utf-8')
         state = raw.trim() ? (JSON.parse(raw) as StateFile) : {}
       } catch (err) {
         log('Failed to read/parse state.json:', err)
@@ -85,7 +94,7 @@ export async function POST(req: Request) {
       reminders,
     }
 
-    await writeFile(STATE_PATH, JSON.stringify(updatedState, null, 2), 'utf-8')
+    await writeFile(statePath, JSON.stringify(updatedState, null, 2), 'utf-8')
     log(`Marked ${markedCount} reminder(s) as completed and updated state.json`)
 
     return new Response(

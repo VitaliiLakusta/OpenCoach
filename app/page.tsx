@@ -281,18 +281,24 @@ export default function Home() {
       return
     }
 
-    console.log('[RemindersCheck] Starting reminder check polling every 10 seconds')
+    if (!actualNotesFolderPath || !actualNotesFolderPath.trim()) {
+      return
+    }
+
+    const folder = actualNotesFolderPath.trim()
+    console.log('[RemindersCheck] Starting reminder check polling every 10 seconds for folder:', folder)
 
     const checkDueReminders = async () => {
       try {
-        const res = await fetch('/api/reminders/check', {
+        // Pass notesFolderPath as a query parameter
+        const res = await fetch(`/api/reminders/check?notesFolderPath=${encodeURIComponent(folder)}`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
           },
         })
         const json = await res.json().catch(() => null)
-        
+
         if (!json || !json.ok) {
           console.error('[RemindersCheck] Error response:', json)
           return
@@ -303,9 +309,9 @@ export default function Home() {
 
         if (dueReminders.length > 0) {
           console.log(`[RemindersCheck] Found ${dueReminders.length} due reminder(s), firing notifications...`)
-          
+
           const firedReminderDateTimes: string[] = []
-          
+
           // Fire notifications for each due reminder
           for (const reminder of dueReminders) {
             try {
@@ -315,21 +321,21 @@ export default function Home() {
                   requireInteraction: true,
                   silent: false,
                 })
-                
+
                 notification.onclick = () => {
                   console.log('✅ Reminder notification clicked:', reminder.reminderText)
                   window.focus()
                   notification.close()
                 }
-                
+
                 notification.onshow = () => {
-                  console.log('✅✅✅ Reminder notification SHOWN:', reminder.reminderText)
+                  console.log('✅✅ Reminder notification SHOWN:', reminder.reminderText)
                 }
-                
+
                 notification.onerror = (error) => {
                   console.error('❌ Reminder notification error:', error, reminder)
                 }
-                
+
                 console.log(`[RemindersCheck] Fired notification: "${reminder.reminderText}"`)
                 firedReminderDateTimes.push(reminder.dateTime)
               }
@@ -347,11 +353,14 @@ export default function Home() {
                 headers: {
                   'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ reminderDateTimes: firedReminderDateTimes }),
+                body: JSON.stringify({
+                  reminderDateTimes: firedReminderDateTimes,
+                  notesFolderPath: folder
+                }),
               })
               const completeJson = await completeRes.json().catch(() => null)
               console.log('[RemindersCheck] Mark completed result:', completeJson)
-              
+
               if (!completeJson || !completeJson.ok) {
                 console.error('[RemindersCheck] Failed to mark reminders as completed, skipping re-calculation')
                 return // Don't re-calculate if marking failed
@@ -401,7 +410,7 @@ export default function Home() {
       console.log('[RemindersCheck] Stopping reminder check polling')
       clearInterval(intervalId)
     }
-  }, [notificationPermission, apiKeys.openai])
+  }, [notificationPermission, apiKeys.openai, actualNotesFolderPath])
 
   return (
     <div className="min-h-screen flex bg-gradient-to-b from-slate-50 to-white">
@@ -422,11 +431,10 @@ export default function Home() {
                 <button
                   key={space.path}
                   onClick={() => setSelectedSpace(space)}
-                  className={`w-full text-left px-3 py-2 rounded-lg mb-1 transition-colors duration-150 ${
-                    selectedSpace?.path === space.path
+                  className={`w-full text-left px-3 py-2 rounded-lg mb-1 transition-colors duration-150 ${selectedSpace?.path === space.path
                       ? 'bg-blue-100 text-blue-800 font-medium'
                       : 'text-slate-700 hover:bg-slate-100'
-                  }`}
+                    }`}
                 >
                   <div className="flex items-center gap-2">
                     <span className="text-lg">📂</span>
@@ -443,476 +451,475 @@ export default function Home() {
       <div className="flex-1 flex flex-col">
         {/* Header */}
         <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-md border-b border-slate-200 shadow-sm">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="rounded-xl shadow-lg flex items-center justify-center bg-white p-1">
-                <Image src="/logo.png" alt="OpenCoach Logo" width={40} height={40} className="object-contain" />
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="rounded-xl shadow-lg flex items-center justify-center bg-white p-1">
+                  <Image src="/logo.png" alt="OpenCoach Logo" width={40} height={40} className="object-contain" />
+                </div>
+                <h1 className="text-2xl font-semibold">
+                  <span className="text-xl bg-gradient-to-r from-gray-800 via-black to-gray-900 bg-clip-text text-transparent">open</span>
+                  <span className="bg-gradient-to-r from-gray-800 via-black to-gray-900 bg-clip-text text-transparent"> Coach</span>
+                </h1>
               </div>
-              <h1 className="text-2xl font-semibold">
-                <span className="text-xl bg-gradient-to-r from-gray-800 via-black to-gray-900 bg-clip-text text-transparent">open</span>
-                <span className="bg-gradient-to-r from-gray-800 via-black to-gray-900 bg-clip-text text-transparent"> Coach</span>
-              </h1>
             </div>
           </div>
-        </div>
-      </header>
+        </header>
 
-      {/* Settings Panel - Collapsible */}
-      <div className="max-w-4xl mx-auto w-full px-4 sm:px-6 lg:px-8 mt-6">
-        <details className="group">
-          <summary className="cursor-pointer list-none">
-            <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm hover:shadow-md transition-all duration-200">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-slate-700">⚙️ Configuration</span>
-                <svg className="w-5 h-5 text-slate-400 group-open:rotate-180 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
+        {/* Settings Panel - Collapsible */}
+        <div className="max-w-4xl mx-auto w-full px-4 sm:px-6 lg:px-8 mt-6">
+          <details className="group">
+            <summary className="cursor-pointer list-none">
+              <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm hover:shadow-md transition-all duration-200">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-slate-700">⚙️ Configuration</span>
+                  <svg className="w-5 h-5 text-slate-400 group-open:rotate-180 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
               </div>
-            </div>
-          </summary>
-          
-          <div className="mt-3 space-y-3">
-            {/* Notes Folder Path */}
-            <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-              <label className="block text-sm font-semibold text-slate-800 mb-3">
-                Obsidian Notes Folder Root
-              </label>
-              <input
-                type="text"
-                value={notesFolderPath}
-                onChange={(e) => setNotesFolderPath(e.target.value)}
-                placeholder="/path/to/your/notes/folder"
-                className="w-full px-4 py-2.5 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all duration-200"
-              />
-              <p className="text-xs text-slate-500 mt-2">
-                Enter the absolute path to the folder containing your notes
-              </p>
-            </div>
+            </summary>
 
-            {/* iCal Calendar Address */}
-            <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-              <label className="block text-sm font-semibold text-slate-800 mb-3">
-                iCal Calendar Address
-              </label>
-              <input
-                type="url"
-                value={icalCalendarAddress}
-                onChange={(e) => setIcalCalendarAddress(e.target.value)}
-                placeholder="https://calendar.google.com/calendar/ical/..."
-                className="w-full px-4 py-2.5 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all duration-200"
-              />
-              <p className="text-xs text-slate-500 mt-2">
-                Enter your iCal/ICS calendar. You can find it under Google Calendar settings page as a private iCal URL
-              </p>
-            </div>
-
-            {/* Model Selection */}
-            <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-              <label className="block text-sm font-semibold text-slate-800 mb-3">
-                AI Model
-              </label>
-              <select
-                value={selectedModel}
-                onChange={(e) => setSelectedModel(e.target.value)}
-                className="w-full px-4 py-2.5 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all duration-200 bg-white"
-              >
-                {AVAILABLE_MODELS.map((model) => (
-                  <option key={model.id} value={model.id}>
-                    {model.name}
-                  </option>
-                ))}
-              </select>
-              <p className="text-xs text-slate-500 mt-2">
-                Select the AI model to use for conversations. Make sure you have the appropriate API keys configured.
-              </p>
-            </div>
-
-            {/* API Key - Dynamic based on selected model */}
-            <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-              <label className="block text-sm font-semibold text-slate-800 mb-3">
-                {apiKeyInfo.label}
-              </label>
-              <div className="relative">
+            <div className="mt-3 space-y-3">
+              {/* Notes Folder Path */}
+              <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
+                <label className="block text-sm font-semibold text-slate-800 mb-3">
+                  Obsidian Notes Folder Root
+                </label>
                 <input
-                  type={showApiKey ? "text" : "password"}
-                  value={currentApiKey}
-                  onChange={(e) => {
-                    const provider = selectedModelConfig?.provider
-                    if (provider && provider !== 'ollama') {
-                      setApiKeys(prev => ({ ...prev, [provider]: e.target.value }))
-                    }
-                  }}
-                  placeholder={apiKeyInfo.placeholder}
-                  disabled={selectedModelConfig?.provider === 'ollama'}
-                  className={`w-full px-4 py-2.5 pr-12 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all duration-200 ${
-                    selectedModelConfig?.provider === 'ollama' ? 'bg-slate-100 cursor-not-allowed' : ''
-                  }`}
+                  type="text"
+                  value={notesFolderPath}
+                  onChange={(e) => setNotesFolderPath(e.target.value)}
+                  placeholder="/path/to/your/notes/folder"
+                  className="w-full px-4 py-2.5 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all duration-200"
                 />
-                {selectedModelConfig?.provider !== 'ollama' && (
-                  <button
-                    type="button"
-                    onClick={() => setShowApiKey(!showApiKey)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
-                    aria-label={showApiKey ? "Hide API key" : "Show API key"}
-                  >
-                    {showApiKey ? (
-                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
-                      </svg>
-                    ) : (
-                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                      </svg>
-                    )}
-                  </button>
-                )}
-              </div>
-              <p className="text-xs text-slate-500 mt-2">
-                {apiKeyInfo.description}
-              </p>
-            </div>
-
-            {/* Notification Settings */}
-            <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-              <h3 className="text-sm font-semibold text-slate-800 mb-3">Notifications</h3>
-              <div className="flex items-center gap-3 mb-3">
-                <span className="text-2xl">
-                  {notificationPermission === 'granted' ? '✅'
-                    : notificationPermission === 'denied' ? '❌'
-                    : notificationPermission === 'checking' ? '⏳'
-                    : notificationPermission === 'unsupported' ? '❌'
-                    : '⏳'}
-                </span>
-                <div className="flex-1">
-                  <p className="text-sm text-slate-600">
-                    Status: <span className="font-medium text-slate-800">
-                      {notificationPermission === 'granted' ? 'Granted'
-                        : notificationPermission === 'denied' ? 'Denied'
-                        : notificationPermission === 'default' ? 'Pending'
-                        : notificationPermission === 'checking' ? 'Checking...'
-                        : 'Not Supported'}
-                    </span>
-                  </p>
-                </div>
+                <p className="text-xs text-slate-500 mt-2">
+                  Enter the absolute path to the folder containing your notes
+                </p>
               </div>
 
-              <div className="flex gap-2">
-                {notificationPermission !== 'granted' && notificationPermission !== 'unsupported' && notificationPermission !== 'checking' && (
-                  <button
-                    onClick={async () => {
-                      if (typeof window !== 'undefined' && 'Notification' in window) {
-                        const permission = await Notification.requestPermission()
-                        setNotificationPermission(permission)
-                        if (permission === 'granted') {
-                          new Notification('OpenCoach', { body: 'Test notification!' })
-                        }
+              {/* iCal Calendar Address */}
+              <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
+                <label className="block text-sm font-semibold text-slate-800 mb-3">
+                  iCal Calendar Address
+                </label>
+                <input
+                  type="url"
+                  value={icalCalendarAddress}
+                  onChange={(e) => setIcalCalendarAddress(e.target.value)}
+                  placeholder="https://calendar.google.com/calendar/ical/..."
+                  className="w-full px-4 py-2.5 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all duration-200"
+                />
+                <p className="text-xs text-slate-500 mt-2">
+                  Enter your iCal/ICS calendar. You can find it under Google Calendar settings page as a private iCal URL
+                </p>
+              </div>
+
+              {/* Model Selection */}
+              <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
+                <label className="block text-sm font-semibold text-slate-800 mb-3">
+                  AI Model
+                </label>
+                <select
+                  value={selectedModel}
+                  onChange={(e) => setSelectedModel(e.target.value)}
+                  className="w-full px-4 py-2.5 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all duration-200 bg-white"
+                >
+                  {AVAILABLE_MODELS.map((model) => (
+                    <option key={model.id} value={model.id}>
+                      {model.name}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-slate-500 mt-2">
+                  Select the AI model to use for conversations. Make sure you have the appropriate API keys configured.
+                </p>
+              </div>
+
+              {/* API Key - Dynamic based on selected model */}
+              <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
+                <label className="block text-sm font-semibold text-slate-800 mb-3">
+                  {apiKeyInfo.label}
+                </label>
+                <div className="relative">
+                  <input
+                    type={showApiKey ? "text" : "password"}
+                    value={currentApiKey}
+                    onChange={(e) => {
+                      const provider = selectedModelConfig?.provider
+                      if (provider && provider !== 'ollama') {
+                        setApiKeys(prev => ({ ...prev, [provider]: e.target.value }))
                       }
                     }}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors duration-200 shadow-sm"
-                  >
-                    Enable Notifications
-                  </button>
-                )}
+                    placeholder={apiKeyInfo.placeholder}
+                    disabled={selectedModelConfig?.provider === 'ollama'}
+                    className={`w-full px-4 py-2.5 pr-12 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all duration-200 ${selectedModelConfig?.provider === 'ollama' ? 'bg-slate-100 cursor-not-allowed' : ''
+                      }`}
+                  />
+                  {selectedModelConfig?.provider !== 'ollama' && (
+                    <button
+                      type="button"
+                      onClick={() => setShowApiKey(!showApiKey)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                      aria-label={showApiKey ? "Hide API key" : "Show API key"}
+                    >
+                      {showApiKey ? (
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                        </svg>
+                      ) : (
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                        </svg>
+                      )}
+                    </button>
+                  )}
+                </div>
+                <p className="text-xs text-slate-500 mt-2">
+                  {apiKeyInfo.description}
+                </p>
+              </div>
+
+              {/* Notification Settings */}
+              <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
+                <h3 className="text-sm font-semibold text-slate-800 mb-3">Notifications</h3>
+                <div className="flex items-center gap-3 mb-3">
+                  <span className="text-2xl">
+                    {notificationPermission === 'granted' ? '✅'
+                      : notificationPermission === 'denied' ? '❌'
+                        : notificationPermission === 'checking' ? '⏳'
+                          : notificationPermission === 'unsupported' ? '❌'
+                            : '⏳'}
+                  </span>
+                  <div className="flex-1">
+                    <p className="text-sm text-slate-600">
+                      Status: <span className="font-medium text-slate-800">
+                        {notificationPermission === 'granted' ? 'Granted'
+                          : notificationPermission === 'denied' ? 'Denied'
+                            : notificationPermission === 'default' ? 'Pending'
+                              : notificationPermission === 'checking' ? 'Checking...'
+                                : 'Not Supported'}
+                      </span>
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  {notificationPermission !== 'granted' && notificationPermission !== 'unsupported' && notificationPermission !== 'checking' && (
+                    <button
+                      onClick={async () => {
+                        if (typeof window !== 'undefined' && 'Notification' in window) {
+                          const permission = await Notification.requestPermission()
+                          setNotificationPermission(permission)
+                          if (permission === 'granted') {
+                            new Notification('OpenCoach', { body: 'Test notification!' })
+                          }
+                        }
+                      }}
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors duration-200 shadow-sm"
+                    >
+                      Enable Notifications
+                    </button>
+                  )}
+                  {notificationPermission === 'granted' && (
+                    <button
+                      onClick={() => {
+                        console.log('=== MANUAL TEST BUTTON CLICKED ===')
+                        if (typeof window !== 'undefined' && 'Notification' in window) {
+                          console.log('Creating manual test notification...')
+                          try {
+                            const notification = new Notification('OpenCoach Manual Test', {
+                              body: `Manual test at ${new Date().toLocaleTimeString()}!`,
+                              requireInteraction: true,
+                              silent: false,
+                            })
+                            console.log('Manual notification object created:', notification)
+
+                            notification.onclick = () => {
+                              console.log('✅ Manual test notification clicked!')
+                              window.focus()
+                              notification.close()
+                            }
+                            notification.onshow = () => {
+                              console.log('✅✅✅ Manual test notification SHOWN!')
+                            }
+                            notification.onerror = (error) => {
+                              console.error('❌ Manual test notification error:', error)
+                            }
+                            notification.onclose = () => {
+                              console.log('Manual test notification closed')
+                            }
+                          } catch (error) {
+                            console.error('❌ Exception in manual test:', error)
+                          }
+                        } else {
+                          console.error('Notifications not supported in this context')
+                        }
+                      }}
+                      className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors duration-200 shadow-sm"
+                    >
+                      Test Notification
+                    </button>
+                  )}
+                </div>
+
                 {notificationPermission === 'granted' && (
-                  <button
-                    onClick={() => {
-                      console.log('=== MANUAL TEST BUTTON CLICKED ===')
-                      if (typeof window !== 'undefined' && 'Notification' in window) {
-                        console.log('Creating manual test notification...')
-                        try {
-                          const notification = new Notification('OpenCoach Manual Test', {
-                            body: `Manual test at ${new Date().toLocaleTimeString()}!`,
-                            requireInteraction: true,
-                            silent: false,
-                          })
-                          console.log('Manual notification object created:', notification)
-
-                          notification.onclick = () => {
-                            console.log('✅ Manual test notification clicked!')
-                            window.focus()
-                            notification.close()
-                          }
-                          notification.onshow = () => {
-                            console.log('✅✅✅ Manual test notification SHOWN!')
-                          }
-                          notification.onerror = (error) => {
-                            console.error('❌ Manual test notification error:', error)
-                          }
-                          notification.onclose = () => {
-                            console.log('Manual test notification closed')
-                          }
-                        } catch (error) {
-                          console.error('❌ Exception in manual test:', error)
-                        }
-                      } else {
-                        console.error('Notifications not supported in this context')
-                      }
-                    }}
-                    className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors duration-200 shadow-sm"
-                  >
-                    Test Notification
-                  </button>
+                  <p className="text-xs text-slate-500 mt-3">
+                    Check browser console for detailed logs. If you see "Notification SHOWN" but no popup, check your OS/browser notification settings.
+                  </p>
+                )}
+                {notificationPermission === 'unsupported' && (
+                  <p className="text-xs text-slate-500 mt-3">
+                    Your browser does not support notifications. Try using Chrome, Firefox, or Safari.
+                  </p>
                 )}
               </div>
-
-              {notificationPermission === 'granted' && (
-                <p className="text-xs text-slate-500 mt-3">
-                  Check browser console for detailed logs. If you see "Notification SHOWN" but no popup, check your OS/browser notification settings.
-                </p>
-              )}
-              {notificationPermission === 'unsupported' && (
-                <p className="text-xs text-slate-500 mt-3">
-                  Your browser does not support notifications. Try using Chrome, Firefox, or Safari.
-                </p>
-              )}
             </div>
-          </div>
-        </details>
-      </div>
+          </details>
+        </div>
 
-      {/* Chat Messages */}
-      <div className="flex-1 max-w-4xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 overflow-y-auto">
-        {messages.length === 0 && (
-          <div className="h-full flex items-center justify-center">
-            <div className="text-center space-y-4">
-              <div className="mx-auto rounded-2xl shadow-lg flex items-center justify-center bg-white p-2">
-                <Image src="/logo.png" alt="OpenCoach Logo" width={64} height={64} className="object-contain" />
-              </div>
-              <h2 className="text-2xl font-semibold text-slate-800">Welcome to open Coach</h2>
-              <p className="text-slate-500 max-w-md">
-                Start a conversation with your AI coaching assistant. Ask questions, share thoughts, or get guidance on your goals.
-              </p>
-            </div>
-          </div>
-        )}
-        
-        <div className="space-y-6">
-          {messages
-            .filter((message) => message.content && message.content.trim() !== '')
-            .map((message) => (
-            <div
-              key={message.id}
-              className={`flex gap-4 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-            >
-              {message.role === 'assistant' && (
-                <div className="w-8 h-8 rounded-lg shadow-md flex items-center justify-center bg-white flex-shrink-0 mt-1">
-                  <Image src="/logo.png" alt="OpenCoach" width={32} height={32} className="object-contain" />
+        {/* Chat Messages */}
+        <div className="flex-1 max-w-4xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 overflow-y-auto">
+          {messages.length === 0 && (
+            <div className="h-full flex items-center justify-center">
+              <div className="text-center space-y-4">
+                <div className="mx-auto rounded-2xl shadow-lg flex items-center justify-center bg-white p-2">
+                  <Image src="/logo.png" alt="OpenCoach Logo" width={64} height={64} className="object-contain" />
                 </div>
-              )}
+                <h2 className="text-2xl font-semibold text-slate-800">Welcome to open Coach</h2>
+                <p className="text-slate-500 max-w-md">
+                  Start a conversation with your AI coaching assistant. Ask questions, share thoughts, or get guidance on your goals.
+                </p>
+              </div>
+            </div>
+          )}
 
-              <div className={`flex flex-col max-w-3xl ${message.role === 'user' ? 'items-end' : 'items-start'}`}>
+          <div className="space-y-6">
+            {messages
+              .filter((message) => message.content && message.content.trim() !== '')
+              .map((message) => (
                 <div
-                  className={`
+                  key={message.id}
+                  className={`flex gap-4 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                >
+                  {message.role === 'assistant' && (
+                    <div className="w-8 h-8 rounded-lg shadow-md flex items-center justify-center bg-white flex-shrink-0 mt-1">
+                      <Image src="/logo.png" alt="OpenCoach" width={32} height={32} className="object-contain" />
+                    </div>
+                  )}
+
+                  <div className={`flex flex-col max-w-3xl ${message.role === 'user' ? 'items-end' : 'items-start'}`}>
+                    <div
+                      className={`
                     px-5 py-3.5 rounded-2xl shadow-sm
                     ${message.role === 'user'
-                      ? 'bg-gradient-to-br from-blue-600 to-blue-700 text-white'
-                      : 'bg-white border border-slate-200 text-slate-800'
-                    }
+                          ? 'bg-gradient-to-br from-blue-600 to-blue-700 text-white'
+                          : 'bg-white border border-slate-200 text-slate-800'
+                        }
                   `}
-                >
-                  {message.role === 'assistant' ? (
-                    <div className="text-sm leading-relaxed prose prose-sm max-w-none prose-a:text-blue-600 prose-a:no-underline hover:prose-a:underline">
-                      <ReactMarkdown 
-                        remarkPlugins={[remarkGfm]}
-                        components={{
-                          a: ({ href, children, ...props }) => {
-                            // Handle .ics file links (both data URLs and API endpoints)
-                            if (href && (href.startsWith('data:text/calendar') || href.startsWith('/api/calendar/ics'))) {
-                              const handleDownload = (e: React.MouseEvent<HTMLAnchorElement>) => {
-                                e.preventDefault()
-                                e.stopPropagation()
-                                
-                                // For API endpoints, fetch and download the file
-                                if (href.startsWith('/api/calendar/ics')) {
-                                  fetch(href)
-                                    .then(response => response.blob())
-                                    .then(blob => {
+                    >
+                      {message.role === 'assistant' ? (
+                        <div className="text-sm leading-relaxed prose prose-sm max-w-none prose-a:text-blue-600 prose-a:no-underline hover:prose-a:underline">
+                          <ReactMarkdown
+                            remarkPlugins={[remarkGfm]}
+                            components={{
+                              a: ({ href, children, ...props }) => {
+                                // Handle .ics file links (both data URLs and API endpoints)
+                                if (href && (href.startsWith('data:text/calendar') || href.startsWith('/api/calendar/ics'))) {
+                                  const handleDownload = (e: React.MouseEvent<HTMLAnchorElement>) => {
+                                    e.preventDefault()
+                                    e.stopPropagation()
+
+                                    // For API endpoints, fetch and download the file
+                                    if (href.startsWith('/api/calendar/ics')) {
+                                      fetch(href)
+                                        .then(response => response.blob())
+                                        .then(blob => {
+                                          const url = URL.createObjectURL(blob)
+                                          const a = document.createElement('a')
+                                          a.href = url
+                                          a.download = 'event.ics'
+                                          document.body.appendChild(a)
+                                          a.click()
+                                          document.body.removeChild(a)
+                                          URL.revokeObjectURL(url)
+                                        })
+                                        .catch(error => {
+                                          console.error('Error downloading .ics file:', error)
+                                        })
+                                      return
+                                    }
+
+                                    // For data URLs, handle the download programmatically
+                                    try {
+                                      // Extract content from data URL
+                                      const commaIndex = href.indexOf(',')
+                                      if (commaIndex === -1) {
+                                        throw new Error('Invalid data URL format')
+                                      }
+                                      const contentPart = href.substring(commaIndex + 1)
+
+                                      // Try to extract filename from the link text
+                                      let filename = 'event.ics'
+                                      if (typeof children === 'string') {
+                                        // If link text contains .ics, use it as filename
+                                        if (children.includes('.ics')) {
+                                          filename = children.replace(/[^a-z0-9._-]/gi, '_').toLowerCase()
+                                          if (!filename.endsWith('.ics')) {
+                                            filename += '.ics'
+                                          }
+                                        } else {
+                                          // Otherwise, create filename from link text
+                                          filename = children.replace(/[^a-z0-9._-]/gi, '_').toLowerCase() + '.ics'
+                                        }
+                                      }
+
+                                      // Decode the data URL content
+                                      const decodedContent = decodeURIComponent(contentPart)
+
+                                      // Create blob and download
+                                      const blob = new Blob([decodedContent], { type: 'text/calendar;charset=utf-8' })
                                       const url = URL.createObjectURL(blob)
                                       const a = document.createElement('a')
                                       a.href = url
-                                      a.download = 'event.ics'
+                                      a.download = filename
                                       document.body.appendChild(a)
                                       a.click()
                                       document.body.removeChild(a)
                                       URL.revokeObjectURL(url)
-                                    })
-                                    .catch(error => {
+                                    } catch (error) {
                                       console.error('Error downloading .ics file:', error)
-                                    })
-                                  return
-                                }
-                                
-                                // For data URLs, handle the download programmatically
-                                try {
-                                  // Extract content from data URL
-                                  const commaIndex = href.indexOf(',')
-                                  if (commaIndex === -1) {
-                                    throw new Error('Invalid data URL format')
-                                  }
-                                  const contentPart = href.substring(commaIndex + 1)
-                                  
-                                  // Try to extract filename from the link text
-                                  let filename = 'event.ics'
-                                  if (typeof children === 'string') {
-                                    // If link text contains .ics, use it as filename
-                                    if (children.includes('.ics')) {
-                                      filename = children.replace(/[^a-z0-9._-]/gi, '_').toLowerCase()
-                                      if (!filename.endsWith('.ics')) {
-                                        filename += '.ics'
-                                      }
-                                    } else {
-                                      // Otherwise, create filename from link text
-                                      filename = children.replace(/[^a-z0-9._-]/gi, '_').toLowerCase() + '.ics'
                                     }
                                   }
-                                  
-                                  // Decode the data URL content
-                                  const decodedContent = decodeURIComponent(contentPart)
-                                  
-                                  // Create blob and download
-                                  const blob = new Blob([decodedContent], { type: 'text/calendar;charset=utf-8' })
-                                  const url = URL.createObjectURL(blob)
-                                  const a = document.createElement('a')
-                                  a.href = url
-                                  a.download = filename
-                                  document.body.appendChild(a)
-                                  a.click()
-                                  document.body.removeChild(a)
-                                  URL.revokeObjectURL(url)
-                                } catch (error) {
-                                  console.error('Error downloading .ics file:', error)
+
+                                  return (
+                                    <a
+                                      href={href}
+                                      onClick={handleDownload}
+                                      className="text-blue-600 hover:underline"
+                                      {...props}
+                                    >
+                                      {children}
+                                    </a>
+                                  )
                                 }
+
+                                // Regular links open in new tab
+                                return (
+                                  <a
+                                    href={href}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-blue-600 hover:underline"
+                                    {...props}
+                                  >
+                                    {children}
+                                  </a>
+                                )
                               }
-                              
-                              return (
-                                <a 
-                                  href={href} 
-                                  onClick={handleDownload}
-                                  className="text-blue-600 hover:underline"
-                                  {...props}
-                                >
-                                  {children}
-                                </a>
-                              )
-                            }
-                            
-                            // Regular links open in new tab
-                            return (
-                              <a 
-                                href={href} 
-                                target="_blank" 
-                                rel="noopener noreferrer"
-                                className="text-blue-600 hover:underline"
-                                {...props}
-                              >
-                                {children}
-                              </a>
-                            )
-                          }
-                        }}
-                      >
-                        {message.content}
-                      </ReactMarkdown>
+                            }}
+                          >
+                            {message.content}
+                          </ReactMarkdown>
+                        </div>
+                      ) : (
+                        <div className="text-sm leading-relaxed whitespace-pre-wrap break-words">
+                          {message.content}
+                        </div>
+                      )}
                     </div>
-                  ) : (
-                    <div className="text-sm leading-relaxed whitespace-pre-wrap break-words">
-                      {message.content}
+                  </div>
+
+                  {message.role === 'user' && (
+                    <div className="w-8 h-8 rounded-lg bg-slate-700 flex items-center justify-center text-white font-medium text-sm shadow-md flex-shrink-0 mt-1">
+                      U
                     </div>
                   )}
                 </div>
-              </div>
-              
-              {message.role === 'user' && (
-                <div className="w-8 h-8 rounded-lg bg-slate-700 flex items-center justify-center text-white font-medium text-sm shadow-md flex-shrink-0 mt-1">
-                  U
-                </div>
-              )}
-            </div>
-          ))}
-          
-          {isLoading && (
-            <div className="flex gap-4 justify-start">
-              <div className="rounded-lg shadow-md flex items-center justify-center bg-white flex-shrink-0 p-0.5">
-                <Image src="/logo.png" alt="OpenCoach" width={32} height={32} className="object-contain" />
-              </div>
-              <div className="bg-white border border-slate-200 px-5 py-3.5 rounded-2xl shadow-sm">
-                <div className="flex items-center gap-2">
-                  <div className="flex gap-1">
-                    <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                    <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                    <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-                  </div>
-                  <span className="text-sm text-slate-500">Thinking...</span>
-                </div>
-              </div>
-            </div>
-          )}
+              ))}
 
-          {error && (
-            <div className="flex gap-4 justify-start">
-              <div className="rounded-lg shadow-md flex items-center justify-center bg-white flex-shrink-0 p-0.5">
-                <Image src="/logo.png" alt="OpenCoach" width={32} height={32} className="object-contain" />
-              </div>
-              <div className="bg-red-50 border border-red-200 px-5 py-3.5 rounded-2xl shadow-sm max-w-3xl">
-                <div className="flex items-start gap-2">
-                  <svg className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                  </svg>
-                  <div className="flex-1">
-                    <p className="text-sm text-red-800 font-medium">Error</p>
-                    <p className="text-sm text-red-700 mt-1">{error.message}</p>
+            {isLoading && (
+              <div className="flex gap-4 justify-start">
+                <div className="rounded-lg shadow-md flex items-center justify-center bg-white flex-shrink-0 p-0.5">
+                  <Image src="/logo.png" alt="OpenCoach" width={32} height={32} className="object-contain" />
+                </div>
+                <div className="bg-white border border-slate-200 px-5 py-3.5 rounded-2xl shadow-sm">
+                  <div className="flex items-center gap-2">
+                    <div className="flex gap-1">
+                      <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                      <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                      <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                    </div>
+                    <span className="text-sm text-slate-500">Thinking...</span>
                   </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
+
+            {error && (
+              <div className="flex gap-4 justify-start">
+                <div className="rounded-lg shadow-md flex items-center justify-center bg-white flex-shrink-0 p-0.5">
+                  <Image src="/logo.png" alt="OpenCoach" width={32} height={32} className="object-contain" />
+                </div>
+                <div className="bg-red-50 border border-red-200 px-5 py-3.5 rounded-2xl shadow-sm max-w-3xl">
+                  <div className="flex items-start gap-2">
+                    <svg className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    <div className="flex-1">
+                      <p className="text-sm text-red-800 font-medium">Error</p>
+                      <p className="text-sm text-red-700 mt-1">{error.message}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
 
-      {/* Input Form */}
-      <div className="sticky bottom-0 bg-gradient-to-t from-white via-white to-transparent pt-6 pb-6">
-        <div className="max-w-4xl mx-auto w-full px-4 sm:px-6 lg:px-8">
-          <form onSubmit={handleSubmit} className="relative">
-            <div className="flex items-end gap-3 bg-white rounded-2xl shadow-lg border border-slate-200 p-2 focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent transition-all duration-200">
-              <textarea
-                value={input}
-                onChange={handleInputChange}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault()
-                    handleSubmit(e)
-                  }
-                }}
-                placeholder="Message OpenCoach..."
-                disabled={isLoading}
-                rows={1}
-                className="flex-1 px-4 py-3 bg-transparent resize-none outline-none text-slate-800 placeholder-slate-400 max-h-40 overflow-y-auto"
-                style={{ minHeight: '24px' }}
-              />
-              <button
-                type="submit"
-                disabled={isLoading || !input.trim()}
-                className={`
+        {/* Input Form */}
+        <div className="sticky bottom-0 bg-gradient-to-t from-white via-white to-transparent pt-6 pb-6">
+          <div className="max-w-4xl mx-auto w-full px-4 sm:px-6 lg:px-8">
+            <form onSubmit={handleSubmit} className="relative">
+              <div className="flex items-end gap-3 bg-white rounded-2xl shadow-lg border border-slate-200 p-2 focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent transition-all duration-200">
+                <textarea
+                  value={input}
+                  onChange={handleInputChange}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault()
+                      handleSubmit(e)
+                    }
+                  }}
+                  placeholder="Message OpenCoach..."
+                  disabled={isLoading}
+                  rows={1}
+                  className="flex-1 px-4 py-3 bg-transparent resize-none outline-none text-slate-800 placeholder-slate-400 max-h-40 overflow-y-auto"
+                  style={{ minHeight: '24px' }}
+                />
+                <button
+                  type="submit"
+                  disabled={isLoading || !input.trim()}
+                  className={`
                   p-3 rounded-xl font-medium transition-all duration-200 flex-shrink-0
                   ${isLoading || !input.trim()
-                    ? 'bg-slate-200 text-slate-400 cursor-not-allowed' 
-                    : 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-md hover:shadow-lg'
-                  }
+                      ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                      : 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-md hover:shadow-lg'
+                    }
                 `}
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                </svg>
-              </button>
-            </div>
-            <p className="text-xs text-slate-400 mt-2 text-center">
-              Press Enter to send, Shift+Enter for new line
-            </p>
-          </form>
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                  </svg>
+                </button>
+              </div>
+              <p className="text-xs text-slate-400 mt-2 text-center">
+                Press Enter to send, Shift+Enter for new line
+              </p>
+            </form>
+          </div>
         </div>
-      </div>
       </div>
     </div>
   )

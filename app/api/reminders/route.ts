@@ -27,8 +27,6 @@ function log(...args: any[]) {
   console.log(`[RemindersAPI ${timestamp}]`, ...args)
 }
 
-const STATE_PATH = join(process.cwd(), 'state.json')
-
 export async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => ({}))
@@ -43,8 +41,11 @@ export async function POST(req: Request) {
       })
     }
 
+    // Define state path relative to the notes folder
+    const statePath = join(notesFolderPath, 'state.json')
     const contextPath = join(notesFolderPath, 'CONTEXT.md')
     log('Checking CONTEXT.md at:', contextPath)
+    log('Using state file at:', statePath)
 
     let contextStats
     try {
@@ -68,9 +69,9 @@ export async function POST(req: Request) {
 
     // Load existing state.json if present
     let state: StateFile = {}
-    if (fs.existsSync(STATE_PATH)) {
+    if (fs.existsSync(statePath)) {
       try {
-        const raw = await readFile(STATE_PATH, 'utf-8')
+        const raw = await readFile(statePath, 'utf-8')
         state = raw.trim() ? (JSON.parse(raw) as StateFile) : {}
       } catch (err) {
         log('Failed to read/parse existing state.json, starting fresh:', err)
@@ -100,19 +101,19 @@ export async function POST(req: Request) {
     }
 
     const nowIso = new Date().toISOString()
-    
+
     // Merge new reminders with existing ones, preserving completed status
     const existingReminders = state.reminders || []
     const existingRemindersMap = new Map<string, { dateTime: string; reminderText: string; completed?: boolean }>()
-    
+
     // Create a map of existing reminders by dateTime
     for (const existing of existingReminders) {
       existingRemindersMap.set(existing.dateTime, existing)
     }
-    
+
     // Merge: preserve completed reminders, update/add others
     const mergedReminders: Array<{ dateTime: string; reminderText: string; completed?: boolean }> = []
-    
+
     // First, add all new reminders (or update existing non-completed ones)
     for (const newReminder of remindersPayload.reminders) {
       const existing = existingRemindersMap.get(newReminder.dateTime)
@@ -125,7 +126,7 @@ export async function POST(req: Request) {
         mergedReminders.push(newReminder)
       }
     }
-    
+
     // Add any existing completed reminders that are not in the new list
     for (const existing of existingReminders) {
       if (existing.completed === true) {
@@ -137,7 +138,7 @@ export async function POST(req: Request) {
         }
       }
     }
-    
+
     const newState: StateFile = {
       ...state,
       reminders: mergedReminders,
@@ -146,7 +147,7 @@ export async function POST(req: Request) {
       notesFolderPath: notesFolderPath,
     }
 
-    await writeFile(STATE_PATH, JSON.stringify(newState, null, 2), 'utf-8')
+    await writeFile(statePath, JSON.stringify(newState, null, 2), 'utf-8')
     log('Updated state.json with new reminders and lastRun at', nowIso)
 
     return new Response(

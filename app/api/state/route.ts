@@ -2,8 +2,6 @@ import { readFile, writeFile } from 'fs/promises'
 import fs from 'fs'
 import { join } from 'path'
 
-const STATE_PATH = join(process.cwd(), 'state.json')
-
 type StateFile = {
   reminders?: Array<{
     dateTime: string
@@ -16,16 +14,28 @@ type StateFile = {
   [key: string]: any
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
-    if (!fs.existsSync(STATE_PATH)) {
+    const { searchParams } = new URL(req.url)
+    const notesFolderPath = searchParams.get('notesFolderPath')
+
+    if (!notesFolderPath) {
+      return new Response(JSON.stringify({ error: 'notesFolderPath query parameter is required' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    }
+
+    const statePath = join(notesFolderPath, 'state.json')
+
+    if (!fs.existsSync(statePath)) {
       return new Response(JSON.stringify({}), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       })
     }
 
-    const raw = await readFile(STATE_PATH, 'utf-8')
+    const raw = await readFile(statePath, 'utf-8')
     const state = raw.trim() ? (JSON.parse(raw) as StateFile) : {}
 
     return new Response(JSON.stringify(state), {
@@ -44,12 +54,22 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const updates = await req.json()
+    const notesFolderPath = typeof updates?.notesFolderPath === 'string' ? updates.notesFolderPath.trim() : ''
+
+    if (!notesFolderPath) {
+      return new Response(JSON.stringify({ ok: false, error: 'notesFolderPath is required in body' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    }
+
+    const statePath = join(notesFolderPath, 'state.json')
 
     // Load existing state
     let state: StateFile = {}
-    if (fs.existsSync(STATE_PATH)) {
+    if (fs.existsSync(statePath)) {
       try {
-        const raw = await readFile(STATE_PATH, 'utf-8')
+        const raw = await readFile(statePath, 'utf-8')
         state = raw.trim() ? (JSON.parse(raw) as StateFile) : {}
       } catch (err) {
         console.error('Failed to read existing state:', err)
@@ -61,7 +81,7 @@ export async function POST(req: Request) {
     state = { ...state, ...updates }
 
     // Write updated state
-    await writeFile(STATE_PATH, JSON.stringify(state, null, 2), 'utf-8')
+    await writeFile(statePath, JSON.stringify(state, null, 2), 'utf-8')
 
     return new Response(JSON.stringify({ ok: true }), {
       status: 200,
