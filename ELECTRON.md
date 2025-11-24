@@ -37,8 +37,8 @@ npm run electron:build:mac
 ```
 
 This creates:
-- `dist/OpenCoach-0.1.0-universal.dmg` - Disk image installer (Universal: Intel + Apple Silicon)
-- `dist/OpenCoach-0.1.0-universal-mac.zip` - Portable ZIP version
+- `dist/OpenCoach-0.2.0-universal.dmg` - Disk image installer (Universal: Intel + Apple Silicon)
+- `dist/OpenCoach-0.2.0-universal-mac.zip` - Portable ZIP version
 
 **Build for Windows**:
 ```bash
@@ -46,8 +46,8 @@ npm run electron:build:win
 ```
 
 This creates:
-- `dist/OpenCoach Setup 0.1.0.exe` - Windows installer (NSIS)
-- `dist/OpenCoach 0.1.0.exe` - Portable executable
+- `dist/OpenCoach Setup 0.2.0.exe` - Windows installer (NSIS)
+- `dist/OpenCoach 0.2.0.exe` - Portable executable
 
 **Build for Both Platforms**:
 ```bash
@@ -69,7 +69,7 @@ After building, you'll find the installers in the `dist/` directory:
 ## Installation Instructions
 
 ### macOS
-1. Download `OpenCoach-0.1.0-universal.dmg`
+1. Download `OpenCoach-0.2.0-universal.dmg`
 2. Open the DMG file
 3. Drag OpenCoach to the Applications folder
 4. Launch from Applications or Spotlight
@@ -79,7 +79,7 @@ After building, you'll find the installers in the `dist/` directory:
 - Or go to System Settings → Privacy & Security and allow the app
 
 ### Windows
-1. Download `OpenCoach Setup 0.1.0.exe`
+1. Download `OpenCoach Setup 0.2.0.exe`
 2. Run the installer
 3. Follow the installation wizard
 4. Launch from Start Menu or Desktop shortcut
